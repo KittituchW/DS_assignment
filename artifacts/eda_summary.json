@@ -1,0 +1,71 @@
+{
+  "rows_after_deduplication": 31991,
+  "movies": 16000,
+  "tv_shows": 15991,
+  "year_range": [
+    2010,
+    2025
+  ],
+  "year_counts_by_type": {
+    "Movie": {
+      "2010": 1000,
+      "2011": 1000,
+      "2012": 1000,
+      "2013": 1000,
+      "2014": 1000,
+      "2015": 1000,
+      "2016": 1000,
+      "2017": 1000,
+      "2018": 1000,
+      "2019": 1000,
+      "2020": 1000,
+      "2021": 1000,
+      "2022": 1000,
+      "2023": 1000,
+      "2024": 1000,
+      "2025": 1000
+    },
+    "TV Show": {
+      "2010": 1000,
+      "2011": 1000,
+      "2012": 1000,
+      "2013": 1000,
+      "2014": 1000,
+      "2015": 1000,
+      "2016": 1000,
+      "2017": 1000,
+      "2018": 1000,
+      "2019": 1000,
+      "2020": 1000,
+      "2021": 1000,
+      "2022": 1000,
+      "2023": 1000,
+      "2024": 1000,
+      "2025": 991
+    }
+  },
+  "missing_pct_by_type": {
+    "Movie": {
+      "director": 0.83,
+      "cast": 1.27,
+      "country": 2.91,
+      "genres": 0.67,
+      "description": 0.83
+    },
+    "TV Show": {
+      "director": 68.54,
+      "cast": 7.23,
+      "country": 11.23,
+      "genres": 6.08,
+      "description": 20.03
+    }
+  },
+  "zero_vote_items": 4560,
+  "low_vote_items_lt_20": 13620,
+  "rating_duplicates_vote_average": true,
+  "movie_duration_missing_pct": 100.0,
+  "tv_duration_unique_values": [
+    "1 Seasons"
+  ],
+  "date_year_equals_release_year_pct": 100.0
+}

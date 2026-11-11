@@ -1,0 +1,16 @@
+persona,seed_titles,rank,recommended_title,type,release_year,score,shared_genres
+Mind-bending science fiction,Inception | Black Mirror | Stranger Things,1,NEXT,TV Show,2020,0.9500294327735901,"Drama, Fantasy, Science Fiction"
+Mind-bending science fiction,Inception | Black Mirror | Stranger Things,2,Camelot,TV Show,2011,0.9409211277961731,"Drama, Fantasy, Science Fiction"
+Mind-bending science fiction,Inception | Black Mirror | Stranger Things,3,The Underground Railroad,TV Show,2021,0.9402607679367065,"Drama, Fantasy, Science Fiction"
+Mind-bending science fiction,Inception | Black Mirror | Stranger Things,4,The Terror,TV Show,2018,0.9366886615753174,"Drama, Fantasy, Mystery, Science Fiction"
+Mind-bending science fiction,Inception | Black Mirror | Stranger Things,5,Don't Look Deeper,TV Show,2020,0.9364601373672485,"Drama, Fantasy, Science Fiction"
+Korean drama and suspense,Crash Landing on You | Squid Game,1,Mine,TV Show,2021,0.9470425248146057,"Drama, Mystery"
+Korean drama and suspense,Crash Landing on You | Squid Game,2,Fashion King,TV Show,2012,0.9368624687194824,Drama
+Korean drama and suspense,Crash Landing on You | Squid Game,3,The Uncanny Counter,TV Show,2020,0.9337353706359863,"Action, Adventure, Drama, Mystery"
+Korean drama and suspense,Crash Landing on You | Squid Game,4,Parasyte: The Grey,TV Show,2024,0.9328448176383972,"Action, Adventure, Drama"
+Korean drama and suspense,Crash Landing on You | Squid Game,5,KBS Drama Special,TV Show,2010,0.9278378486633301,Drama
+Family animation,Coco | Shrek Forever After,1,Competition,Movie,2015,0.9405456781387329,"Animation, Family"
+Family animation,Coco | Shrek Forever After,2,Spirit Untamed,Movie,2021,0.9377338886260986,"Adventure, Animation, Family"
+Family animation,Coco | Shrek Forever After,3,Lou,Movie,2017,0.9367109537124634,"Animation, Comedy, Family, Fantasy"
+Family animation,Coco | Shrek Forever After,4,Missing Link,Movie,2019,0.9353487491607666,"Adventure, Animation, Comedy, Family"
+Family animation,Coco | Shrek Forever After,5,Cosmic Scrat-tastrophe,Movie,2015,0.9331907629966736,"Adventure, Animation, Comedy, Family"
