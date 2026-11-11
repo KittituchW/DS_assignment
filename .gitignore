@@ -14,7 +14,8 @@ data/
 models/
 slides/
 *.pptx
+*.pdf
 *.zip
 
-# Keep the final presentation in the assignment submission package.
-!slide/*.pptx
+# Keep only the final PDF presentation in the repository.
+!slide/*.pdf

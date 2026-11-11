@@ -57,8 +57,8 @@ The checked-in `artifacts/` directory contains a completed seed-42 run. See
 - `notebooks/01_eda_and_recommender.ipynb` is an executed walkthrough of the
   cleaning decisions, EDA, temporal proxy design, model comparison and sample
   recommendations. Set `RUN_TRAINING = True` to rerun the full experiment.
-- The submission package places the final eight-slide PowerPoint deck under
-  `slide/`. Its quantitative charts remain editable PowerPoint charts.
+- The repository places the final eight-slide presentation as a PDF under
+  `slide/`. The editable PowerPoint source is kept outside the repository.
 
 ## Interpretation boundary
 
