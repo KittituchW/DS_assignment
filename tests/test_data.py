@@ -70,3 +70,14 @@ def test_catalogue_round_trip_keeps_list_columns(raw: pd.DataFrame, tmp_path) ->
     back = load_catalogue(tmp_path / "catalogue.csv")
     assert back["genres"].tolist() == cat["genres"].tolist()
     assert back["cast"].tolist() == cat["cast"].tolist()
+
+
+def test_text_line_breaks_are_flattened_so_csv_round_trips(raw: pd.DataFrame, tmp_path) -> None:
+    raw = raw.copy()
+    raw.loc[0, "description"] = "First line.\r\nSecond   line.\rThird\tline."
+    cat = build_catalogue(raw)
+    assert cat.loc[cat.item_id.eq("movie_1000"), "description"].item() == "First line. Second line. Third line."
+    assert not cat["description"].str.contains(r"[\r\n\t]").any()
+    save_catalogue(cat, tmp_path / "catalogue.csv")
+    back = load_catalogue(tmp_path / "catalogue.csv")
+    assert back["description"].tolist() == cat["description"].tolist()

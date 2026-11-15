@@ -22,9 +22,12 @@ Cleaning decisions (each one comes from an EDA finding, see `eda.py`):
    removed mainstream titles ("lover" inside "10 Cloverfield Lane", "lust"
    inside "Wanderlust"), while the adult cluster sits in low-vote titles. The
    data has no maturity rating, so this filter is known to be incomplete.
-8. Popularity becomes a percentile within type, because movie and TV
+8. Line breaks and repeated spaces inside text fields become single spaces.
+   Some descriptions contain carriage returns, which break CSV round trips
+   in pandas 2.
+9. Popularity becomes a percentile within type, because movie and TV
    popularity use different scales.
-9. A Bayesian weighted rating shrinks low-vote averages towards the mean.
+10. A Bayesian weighted rating shrinks low-vote averages towards the mean.
 """
 
 from __future__ import annotations
@@ -122,6 +125,11 @@ def split_list(value: object) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
+def clean_text(values: pd.Series) -> pd.Series:
+    """Missing becomes empty; any run of whitespace (including line breaks) becomes one space."""
+    return values.fillna("").astype(str).str.replace(r"\s+", " ", regex=True).str.strip()
+
+
 def harmonise_genres(value: object) -> list[str]:
     out: list[str] = []
     for genre in split_list(value):
@@ -164,9 +172,8 @@ def build_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
     df["genres"] = df["genres"].map(harmonise_genres)
     df["cast"] = df["cast"].map(split_list)
     df["country"] = df["country"].map(split_list)
-    df["director"] = df["director"].fillna("").astype(str).str.strip()
-    df["description"] = df["description"].fillna("").astype(str).str.strip()
-    df["title"] = df["title"].fillna("").astype(str)
+    for col in ("title", "director", "description"):
+        df[col] = clean_text(df[col])
     df["language"] = df["language"].fillna("unknown").astype(str)
 
     # 7: recommendable flag, one column per reason
@@ -177,7 +184,7 @@ def build_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
     df["excluded_adult_keyword"] = keyword & (df["vote_count"] < ADULT_MAX_VOTES)
     df["recommendable"] = ~(df["excluded_no_content"] | df["excluded_low_votes"] | df["excluded_adult_keyword"])
 
-    # 8 and 9
+    # 9 and 10
     df["popularity"] = df["popularity"].fillna(0.0)
     df["popularity_pct"] = df.groupby("type")["popularity"].rank(pct=True)
     df["weighted_rating"] = bayesian_rating(df["vote_average"], df["vote_count"])
