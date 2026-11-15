@@ -1,163 +1,230 @@
+"""Run the full experiment, stage by stage.
+
+Stages (default: all four, in order):
+    prepare    check inputs, clean catalogue, EDA, item features, simulated viewers
+    baselines  popularity, most watched, content kNN (+ text-only and no-text) on every dataset
+    train      two tower: H1 ablation (5 seeds at p = 6) and H2 sweep (p = 2 and 12). Needs PyTorch.
+    analyse    H1 and H2 decision rules, result tables, figures, sample recommendations
+
+Examples:
+    python run_experiment.py --download                 # everything, about 20 minutes on a laptop CPU
+    python run_experiment.py --stages prepare baselines analyse   # no PyTorch needed
+    python run_experiment.py --stages analyse           # re-run the analysis from saved runs
+"""
+
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import random
 import sys
+import time
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", str(Path(".mplconfig").resolve()))
-
-import joblib
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import torch
-
 PROJECT_ROOT = Path(__file__).resolve().parent
+os.environ.setdefault("MPLCONFIGDIR", str(PROJECT_ROOT / ".mplconfig"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from recommender.data import CORE_METADATA, build_eda_summary, load_and_clean_catalog
-from recommender.evaluation import (
-    build_cold_start_episodes,
-    evaluate_models,
-    recommend_for_personas,
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+
+from recommender import analysis  # noqa: E402
+from recommender.data import (  # noqa: E402
+    build_catalogue,
+    check_inputs,
+    download_raw,
+    load_catalogue,
+    load_raw,
+    recommendable_items,
+    save_catalogue,
 )
-from recommender.features import fit_content_features
-from recommender.neural import encode, train_projection_network
+from recommender.eda import save_eda  # noqa: E402
+from recommender.evaluation import (  # noqa: E402
+    content_knn_scorer,
+    evaluate,
+    most_watched_scorer,
+    popularity_scorer,
+    temporal_split,
+    two_tower_scorer,
+)
+from recommender.features import ItemFeatures, build_item_features  # noqa: E402
+from recommender.simulate import SimConfig, demo_histories, simulate  # noqa: E402
+
+STAGES = ["prepare", "baselines", "train", "analyse"]
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train and compare catalog recommendation models")
-    parser.add_argument("--movies", required=True, help="Path to the movie CSV")
-    parser.add_argument("--tv", required=True, help="Path to the TV CSV")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--data-dir", default=str(PROJECT_ROOT / "data" / "raw"), help="folder with the two CSV files")
+    parser.add_argument("--download", action="store_true", help="download missing CSV files from the pinned commit")
     parser.add_argument("--output", default=str(PROJECT_ROOT / "artifacts"))
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--episodes", type=int, default=500)
-    parser.add_argument("--epochs", type=int, default=15)
+    parser.add_argument("--stages", nargs="+", choices=STAGES, default=STAGES)
+    parser.add_argument("--users", type=int, default=3000)
+    parser.add_argument("--exponents", type=float, nargs="+", default=[2.0, 6.0, 12.0])
+    parser.add_argument("--main-exponent", type=float, default=6.0)
+    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--sim-seed", type=int, default=42)
     return parser.parse_args()
 
 
-def save_eda_figures(catalog: pd.DataFrame, output: Path) -> None:
-    missing = catalog.groupby("type")[CORE_METADATA].apply(lambda x: x.isna().mean() * 100)
-    ax = missing.T.plot(kind="bar", figsize=(9, 5), color=["#2563eb", "#f97316"])
-    ax.set_ylabel("Missing values (%)")
-    ax.set_title("Metadata missingness differs sharply by content type")
-    ax.legend(title="")
-    plt.xticks(rotation=25, ha="right")
-    plt.tight_layout()
-    plt.savefig(output / "eda_missingness.png", dpi=180)
-    plt.close()
+class Paths:
+    def __init__(self, output: str) -> None:
+        self.out = Path(output)
+        self.cache = self.out / "cache"
+        self.runs = self.cache / "runs"
+        self.models = self.cache / "models"
+        for p in (self.out, self.cache, self.runs, self.models):
+            p.mkdir(parents=True, exist_ok=True)
 
-    counts = catalog.groupby(["release_year", "type"]).size().unstack(fill_value=0)
-    ax = counts.plot(figsize=(9, 4), marker="o", color=["#2563eb", "#f97316"])
-    ax.set_ylabel("Catalog rows")
-    ax.set_title("The dataset is uniformly sampled by year and type")
-    ax.legend(title="")
-    plt.tight_layout()
-    plt.savefig(output / "eda_year_counts.png", dpi=180)
-    plt.close()
+    def events(self, exponent: float) -> Path:
+        return self.cache / f"events_p{exponent:g}.csv"
+
+    def item_table(self, exponent: float, seed: int) -> Path:
+        return self.models / f"item_table_p{exponent:g}_s{seed}.npy"
 
 
-def save_metrics_figure(metrics: pd.DataFrame, output: Path) -> None:
-    plot = metrics.set_index("model")[["recall@10", "ndcg@10", "mrr@10"]]
-    ax = plot.plot(kind="bar", figsize=(9, 5), color=["#2563eb", "#14b8a6", "#f97316"])
-    ax.set_ylim(0, max(0.05, float(plot.to_numpy().max()) * 1.2))
-    ax.set_ylabel("Score")
-    ax.set_title("Cold-start proxy evaluation on 2025 titles")
-    plt.xticks(rotation=20, ha="right")
-    plt.tight_layout()
-    plt.savefig(output / "model_comparison.png", dpi=180)
-    plt.close()
+def load_items(paths: Paths) -> tuple[pd.DataFrame, ItemFeatures]:
+    items = recommendable_items(load_catalogue(paths.cache / "catalogue.csv"))
+    feats = ItemFeatures.load(paths.cache / "item_features.npz")
+    if list(feats.item_ids) != list(items["item_id"]):
+        raise RuntimeError("feature rows do not match the catalogue order; re-run the prepare stage")
+    return items, feats
+
+
+def load_split(paths: Paths, exponent: float, items: pd.DataFrame):
+    events = pd.read_csv(paths.events(exponent), parse_dates=["ts"])
+    return temporal_split(events, list(items["item_id"]))
+
+
+# ------------------------------------------------------------------ stages
+
+
+def stage_prepare(args: argparse.Namespace, paths: Paths) -> dict:
+    data_dir = Path(args.data_dir)
+    if args.download:
+        download_raw(data_dir)
+    hashes = check_inputs(data_dir)
+    raw = load_raw(data_dir)
+    catalogue = build_catalogue(raw)
+    save_catalogue(catalogue, paths.cache / "catalogue.csv")
+    catalogue = load_catalogue(paths.cache / "catalogue.csv")
+    summary = save_eda(raw, catalogue, paths.out)
+    items = recommendable_items(catalogue)
+    print(f"catalogue: {len(catalogue):,} items, {len(items):,} recommendable")
+
+    feats = build_item_features(items, seed=args.sim_seed)
+    feats.save(paths.cache / "item_features.npz")
+    print(f"features: {feats.matrix.shape}, groups {list(feats.groups)}")
+
+    demo_histories(items).to_csv(paths.cache / "demo_histories.csv", index=False)
+    sim = {}
+    for p in args.exponents:
+        t0 = time.time()
+        events = simulate(items, SimConfig(users=args.users, pop_exponent=p, seed=args.sim_seed))
+        events.to_csv(paths.events(p), index=False)
+        counts = events["item_id"].value_counts()
+        head = counts.head(max(1, int(len(counts) * 0.01))).sum() / len(events)
+        sim[f"{p:g}"] = {"events": len(events), "items_watched": int(len(counts)), "top_1pct_item_share": round(float(head), 3)}
+        print(f"events p={p:g}: {len(events):,} events, top 1% of items take {head:.1%} ({time.time() - t0:.0f}s)")
+    return {"input_sha256": hashes, "eda": summary, "simulation": sim}
+
+
+def stage_baselines(args: argparse.Namespace, paths: Paths) -> None:
+    items, feats = load_items(paths)
+    for p in args.exponents:
+        split = load_split(paths, p, items)
+        scorers = {
+            "popularity": popularity_scorer(items),
+            "most_watched": most_watched_scorer(split.history_matrix()),
+            "content_knn": content_knn_scorer(feats.matrix),
+            "content_knn_text_only": content_knn_scorer(feats.columns("text")),
+            "content_knn_no_text": content_knn_scorer(feats.matrix * feats.mask_without("text")),
+        }
+        for name, scorer in scorers.items():
+            summary, per_user = evaluate(scorer, split, items)
+            analysis.save_run(paths.runs, name, p, None, summary, per_user)
+            print(f"p={p:g} {name:22s} " + " ".join(f"{k}={v:.3f}" for k, v in summary.items()))
+
+
+def stage_train(args: argparse.Namespace, paths: Paths) -> None:
+    try:
+        from recommender.two_tower import TrainConfig, train_two_tower
+    except ImportError as exc:
+        raise SystemExit(f"PyTorch is needed for the train stage ({exc}). Install requirements.txt or skip this stage.")
+
+    items, feats = load_items(paths)
+    no_text = feats.mask_without("text")
+    runs = []
+    for p in args.exponents:
+        for seed in args.seeds if p == args.main_exponent else args.seeds[:1]:
+            runs.append((p, "two_tower", seed))
+            if p == args.main_exponent:
+                runs.append((p, "two_tower_no_text", seed))
+
+    splits: dict[float, object] = {}
+    for p, variant, seed in runs:
+        split = splits.setdefault(p, load_split(paths, p, items))
+        print(f"== p={p:g} {variant} seed={seed}")
+        t0 = time.time()
+        mask = no_text if variant == "two_tower_no_text" else None
+        _, table, losses = train_two_tower(
+            feats.matrix, split.history_matrix(), TrainConfig(epochs=args.epochs, seed=seed), feature_mask=mask
+        )
+        summary, per_user = evaluate(two_tower_scorer(table), split, items)
+        analysis.save_run(
+            paths.runs, variant, p, seed, summary, per_user,
+            train_seconds=round(time.time() - t0), loss_history=[round(x, 4) for x in losses],
+        )
+        if variant == "two_tower":
+            np.save(paths.item_table(p, seed), table)
+        print("   " + " ".join(f"{k}={v:.3f}" for k, v in summary.items()))
+
+
+def stage_analyse(args: argparse.Namespace, paths: Paths) -> dict:
+    runs = analysis.all_runs_table(paths.runs)
+    runs.to_csv(paths.out / "metrics_all_runs.csv", index=False)
+    h1 = analysis.check_h1(paths.runs, args.main_exponent, args.seeds)
+    h2 = analysis.check_h2(paths.runs, args.exponents, args.main_exponent, args.seeds)
+    (paths.out / "hypothesis_tests.json").write_text(json.dumps({"H1": h1, "H2": h2}, indent=2), encoding="utf-8")
+    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2), encoding="utf-8")
+    analysis.save_figures(h1, h2, paths.out)
+
+    items, feats = load_items(paths)
+    demo = pd.read_csv(paths.cache / "demo_histories.csv")
+    scorers = {"content_knn": content_knn_scorer(feats.matrix)}
+    table_path = paths.item_table(args.main_exponent, args.seeds[0])
+    if table_path.exists():
+        scorers["two_tower"] = two_tower_scorer(np.load(table_path))
+    records, text = analysis.sample_recommendations(items, demo, scorers)
+    records.to_csv(paths.out / "sample_recommendations.csv", index=False)
+    (paths.out / "sample_recommendations.md").write_text(text, encoding="utf-8")
+    print(f"H1: {h1['verdict']}. H2a: {h2['h2a_verdict']}. H2b: {h2['h2b_verdict']}.")
+    return {"H1": h1["verdict"], "H2a": h2["h2a_verdict"], "H2b": h2["h2b_verdict"]}
 
 
 def main() -> None:
     args = parse_args()
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    output = Path(args.output)
-    output.mkdir(parents=True, exist_ok=True)
+    paths = Paths(args.output)
+    summary_path = paths.out / "run_summary.json"
+    run_summary = json.loads(summary_path.read_text()) if summary_path.exists() else {}
+    run_summary["config"] = {k: v for k, v in vars(args).items() if k not in ("data_dir", "output", "stages")}
 
-    catalog = load_and_clean_catalog(args.movies, args.tv)
-    with (output / "eda_summary.json").open("w", encoding="utf-8") as handle:
-        json.dump(build_eda_summary(catalog), handle, indent=2, ensure_ascii=False)
-    save_eda_figures(catalog, output)
-
-    train_mask = catalog.release_year.le(2023)
-    features = fit_content_features(
-        catalog.loc[train_mask, "feature_document"].tolist(),
-        catalog["feature_document"].tolist(),
-        seed=args.seed,
-    )
-    train_indices = catalog.index[train_mask].to_numpy()
-    training = train_projection_network(
-        features.dense[train_indices],
-        catalog.loc[train_indices].reset_index(drop=True),
-        epochs=args.epochs,
-        seed=args.seed,
-    )
-    neural_embeddings = encode(training.model, features.dense)
-
-    episodes = build_cold_start_episodes(
-        catalog, target_year=2025, max_episodes=args.episodes, seed=args.seed
-    )
-    metrics, _ = evaluate_models(
-        catalog,
-        episodes,
-        features.tfidf,
-        features.dense,
-        neural_embeddings,
-        target_year=2025,
-    )
-    metrics.to_csv(output / "model_metrics.csv", index=False)
-    save_metrics_figure(metrics, output)
-
-    persona_seeds = {
-        "Mind-bending science fiction": ["Inception", "Black Mirror", "Stranger Things"],
-        "Korean drama and suspense": ["Crash Landing on You", "Squid Game"],
-        "Family animation": ["Coco", "Shrek Forever After"],
-    }
-    recommendations = recommend_for_personas(
-        catalog, neural_embeddings, persona_seeds, top_k=5
-    )
-    recommendations.to_csv(output / "sample_recommendations.csv", index=False)
-
-    catalog_export = catalog[
-        [
-            "item_id",
-            "type",
-            "title",
-            "release_year",
-            "language",
-            "genres",
-            "metadata_completeness",
-        ]
-    ]
-    catalog_export.to_csv(output / "clean_catalog_index.csv", index=False)
-    np.save(output / "neural_item_embeddings.npy", neural_embeddings)
-    torch.save(training.model.state_dict(), output / "projection_network.pt")
-    joblib.dump(features.vectorizer, output / "tfidf_vectorizer.joblib")
-    joblib.dump(features.svd, output / "svd.joblib")
-
-    run_summary = {
-        "seed": args.seed,
-        "train_rows": int(train_mask.sum()),
-        "validation_rows_2024": int(catalog.release_year.eq(2024).sum()),
-        "test_rows_2025": int(catalog.release_year.eq(2025).sum()),
-        "evaluation_episodes": len(episodes),
-        "triplets": training.triplet_count,
-        "loss_history": training.loss_history,
-        "tfidf_features": len(features.vectorizer.get_feature_names_out()),
-        "svd_dimensions": int(features.dense.shape[1]),
-        "neural_dimensions": int(neural_embeddings.shape[1]),
-    }
-    with (output / "run_summary.json").open("w", encoding="utf-8") as handle:
-        json.dump(run_summary, handle, indent=2)
-    print(json.dumps(run_summary, indent=2))
-    print("\nMetrics\n", metrics.to_string(index=False))
-    print("\nSample recommendations\n", recommendations.to_string(index=False))
+    for stage in STAGES:
+        if stage not in args.stages:
+            continue
+        print(f"\n### stage: {stage}")
+        t0 = time.time()
+        result = {
+            "prepare": stage_prepare,
+            "baselines": stage_baselines,
+            "train": stage_train,
+            "analyse": stage_analyse,
+        }[stage](args, paths)
+        if result:
+            run_summary[stage] = result
+        run_summary.setdefault("stage_seconds", {})[stage] = round(time.time() - t0)
+        summary_path.write_text(json.dumps(run_summary, indent=2, default=str), encoding="utf-8")
 
 
 if __name__ == "__main__":

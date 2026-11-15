@@ -9,8 +9,9 @@ venv/
 .mplconfig/
 .DS_Store
 
-# Local inputs and generated artifacts
+# Local inputs and regenerable intermediates
 data/
+artifacts/cache/
 models/
 slides/
 *.pptx
