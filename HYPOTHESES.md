@@ -87,3 +87,30 @@ Coverage@10 and TV share@10 are reported as secondary checks.
 
 1. Real viewer lift. That needs logged impressions and watches.
 2. Whether the simulator's rules match real behaviour.
+
+## Deviations
+
+Changes made after the decision rules above were committed. None of them
+changes a decision rule.
+
+**2026-11-15, before any two tower training.** A second round of EDA
+(`artifacts/eda_*.png`) led to three changes.
+
+1. **Adult keyword filter fixed.** Keywords matched inside words, so "lover"
+   removed *10 Cloverfield Lane* and "lust" removed *Wanderlust*. Keywords now
+   match whole words, and only titles with fewer than 100 votes are checked,
+   because the adult cluster sits in low-vote titles. Recommendable titles go
+   from 21,917 to 22,059, so the simulated events change too.
+2. **Exploratory baseline added: popularity by type.** TV titles score about
+   one point higher than movies, which pushes the popularity list towards TV.
+   This baseline ranks rating as a percentile within type. It checks whether
+   H2a is only a type-mix effect. It is reported but is not part of any
+   verdict.
+3. **Exploratory reading of H2 within each content type.** TV is 58%
+   non-English and movies 38%, so a list's non-English share depends on its TV
+   share. The non-English share within movies and within TV is reported next to
+   the held-out watches. It is not part of any verdict.
+
+For transparency: the baseline results behind H2a were computed during
+development, both before and after this change. The two tower model had not
+been trained when this entry was written.
