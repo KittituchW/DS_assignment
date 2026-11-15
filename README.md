@@ -130,8 +130,9 @@ pip install -r requirements.txt
 python run_experiment.py --download    # downloads the two CSVs into data/raw, then runs every stage
 ```
 
-The full run takes about 20 minutes on a laptop: 1.5 minutes to prepare, under
-a minute for the baselines, about a minute per two tower run (12 runs). The
+The full run takes about 10 minutes on a laptop CPU: under a minute to
+prepare, seconds for the baselines, and 30 to 50 seconds per two tower run
+(12 runs). The
 download is pinned to one commit of the dataset repository and the run checks
 each file's SHA-256.
 

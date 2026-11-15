@@ -7,7 +7,7 @@ Stages (default: all four, in order):
     analyse    H1 and H2 decision rules, result tables, figures, sample recommendations
 
 Examples:
-    python run_experiment.py --download                 # everything, about 20 minutes on a laptop CPU
+    python run_experiment.py --download                 # everything, about 10 minutes on a laptop CPU
     python run_experiment.py --stages prepare baselines analyse   # no PyTorch needed
     python run_experiment.py --stages analyse           # re-run the analysis from saved runs
 """
