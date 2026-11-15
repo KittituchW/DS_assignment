@@ -1,0 +1,261 @@
+{
+  "H1": {
+    "exponent": 6.0,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "recall@10_full": 0.029947406019906017,
+    "recall@10_no_text": 0.03113164169164169,
+    "recall@10_difference": {
+      "mean": -0.001184235671735672,
+      "ci_low": -0.0030440545334295336,
+      "ci_high": 0.0008391602240352235
+    },
+    "ndcg@10_full": 0.024653981943304946,
+    "ndcg@10_no_text": 0.025808211640970947,
+    "ndcg@10_difference": {
+      "mean": -0.0011542296976659995,
+      "ci_low": -0.0026916582441779816,
+      "ci_high": 0.00046191357201852455
+    },
+    "per_seed": [
+      {
+        "seed": 42,
+        "recall@10_full": 0.02938426295926296,
+        "recall@10_no_text": 0.029178395215895218
+      },
+      {
+        "seed": 43,
+        "recall@10_full": 0.029167853905353907,
+        "recall@10_no_text": 0.029404526492026493
+      },
+      {
+        "seed": 44,
+        "recall@10_full": 0.03038719382469382,
+        "recall@10_no_text": 0.033378054815554815
+      },
+      {
+        "seed": 45,
+        "recall@10_full": 0.030845260295260295,
+        "recall@10_no_text": 0.031213187275687275
+      },
+      {
+        "seed": 46,
+        "recall@10_full": 0.029952459114959116,
+        "recall@10_no_text": 0.032484044659044656
+      }
+    ],
+    "verdict": "inconclusive"
+  },
+  "H2": {
+    "rule_h2a": "popularity gap upper bound below -10 points at every p",
+    "rule_h2b": "two tower gap interval inside +/-5 points at every p",
+    "exploratory_models": [
+      "popularity_by_type"
+    ],
+    "by_exponent": [
+      {
+        "exponent": 2.0,
+        "popularity": {
+          "non_en@10": 0.0023,
+          "heldout_non_en": 0.40856959891959893,
+          "gap": {
+            "mean": -0.4062695989195989,
+            "ci_low": -0.4162413511951012,
+            "ci_high": -0.3967638138713139
+          }
+        },
+        "most_watched": {
+          "non_en@10": 0.19833333333333333,
+          "heldout_non_en": 0.40856959891959893,
+          "gap": {
+            "mean": -0.21023626558626554,
+            "ci_low": -0.22009888183575682,
+            "ci_high": -0.2007303883269508
+          }
+        },
+        "content_knn": {
+          "non_en@10": 0.1307,
+          "heldout_non_en": 0.40856959891959893,
+          "gap": {
+            "mean": -0.27786959891959895,
+            "ci_low": -0.28978268454924705,
+            "ci_high": -0.2662209499875125
+          }
+        },
+        "two_tower": {
+          "non_en@10": 0.36913333333333337,
+          "heldout_non_en": 0.40856959891959893,
+          "gap": {
+            "mean": -0.03943626558626558,
+            "ci_low": -0.051539036969974465,
+            "ci_high": -0.027058744588744587
+          }
+        },
+        "popularity_by_type": {
+          "non_en@10": 0.09986666666666666,
+          "heldout_non_en": 0.40856959891959893,
+          "gap": {
+            "mean": -0.30870293225293227,
+            "ci_low": -0.31857822487697485,
+            "ci_high": -0.2991968108858734
+          }
+        },
+        "two_tower_seeds": [
+          42
+        ]
+      },
+      {
+        "exponent": 6.0,
+        "popularity": {
+          "non_en@10": 0.006533333333333334,
+          "heldout_non_en": 0.3923098817848818,
+          "gap": {
+            "mean": -0.38577654845154846,
+            "ci_low": -0.395499955969956,
+            "ci_high": -0.37581551349113845
+          }
+        },
+        "most_watched": {
+          "non_en@10": 0.10566666666666667,
+          "heldout_non_en": 0.3923098817848818,
+          "gap": {
+            "mean": -0.2866432151182151,
+            "ci_low": -0.29651471009314756,
+            "ci_high": -0.2766548859126984
+          }
+        },
+        "content_knn": {
+          "non_en@10": 0.12776666666666664,
+          "heldout_non_en": 0.3923098817848818,
+          "gap": {
+            "mean": -0.2645432151182151,
+            "ci_low": -0.27628435068403817,
+            "ci_high": -0.25212041614635367
+          }
+        },
+        "two_tower": {
+          "non_en@10": 0.40615333333333337,
+          "heldout_non_en": 0.3923098817848818,
+          "gap": {
+            "mean": 0.013843451548451555,
+            "ci_low": 0.0021159774184149275,
+            "ci_high": 0.025195921330983834
+          }
+        },
+        "popularity_by_type": {
+          "non_en@10": 0.09969999999999998,
+          "heldout_non_en": 0.3923098817848818,
+          "gap": {
+            "mean": -0.29260988178488173,
+            "ci_low": -0.302217440036815,
+            "ci_high": -0.2828760571951197
+          }
+        },
+        "two_tower_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      },
+      {
+        "exponent": 12.0,
+        "popularity": {
+          "non_en@10": 0.011033333333333334,
+          "heldout_non_en": 0.38924481120731125,
+          "gap": {
+            "mean": -0.37821147787397785,
+            "ci_low": -0.3873553643231768,
+            "ci_high": -0.36814199514605767
+          }
+        },
+        "most_watched": {
+          "non_en@10": 0.40780000000000005,
+          "heldout_non_en": 0.38924481120731125,
+          "gap": {
+            "mean": 0.018555188792688814,
+            "ci_low": 0.00909491104959857,
+            "ci_high": 0.028359171916046935
+          }
+        },
+        "content_knn": {
+          "non_en@10": 0.12123333333333335,
+          "heldout_non_en": 0.38924481120731125,
+          "gap": {
+            "mean": -0.2680114778739779,
+            "ci_low": -0.27964856356606355,
+            "ci_high": -0.2567377758005883
+          }
+        },
+        "two_tower": {
+          "non_en@10": 0.398,
+          "heldout_non_en": 0.38924481120731125,
+          "gap": {
+            "mean": 0.0087551887926888,
+            "ci_low": -0.00237495223526473,
+            "ci_high": 0.019610273811836318
+          }
+        },
+        "popularity_by_type": {
+          "non_en@10": 0.09929999999999999,
+          "heldout_non_en": 0.38924481120731125,
+          "gap": {
+            "mean": -0.2899448112073112,
+            "ci_low": -0.2988861387570763,
+            "ci_high": -0.28017438327875827
+          }
+        },
+        "two_tower_seeds": [
+          42
+        ]
+      }
+    ],
+    "by_type_at_main_exponent": [
+      {
+        "model": "popularity",
+        "tv_share": 0.9000666666666667,
+        "non_en_within_movies": 0.004002668445630421,
+        "non_en_within_tv": 0.0068143100511073255
+      },
+      {
+        "model": "most_watched",
+        "tv_share": 0.5025,
+        "non_en_within_movies": 0.01306532663316583,
+        "non_en_within_tv": 0.19734660033167495
+      },
+      {
+        "model": "content_knn",
+        "tv_share": 0.31753333333333333,
+        "non_en_within_movies": 0.05494773859529159,
+        "non_en_within_tv": 0.2842746168381272
+      },
+      {
+        "model": "two_tower",
+        "tv_share": 0.39565333333333336,
+        "non_en_within_movies": 0.27766624012707936,
+        "non_en_within_tv": 0.6024128867021635
+      },
+      {
+        "model": "popularity_by_type",
+        "tv_share": 0.2978,
+        "non_en_within_movies": 0.14198234121332953,
+        "non_en_within_tv": 0.0
+      },
+      {
+        "model": "held-out watches",
+        "tv_share": 0.32517438963627304,
+        "non_en_within_movies": 0.31278264882325796,
+        "non_en_within_tv": 0.5556406818617123
+      }
+    ],
+    "h2a_verdict": "supported",
+    "h2b_verdict": "not supported",
+    "two_tower_gap_trend": "does not fall steadily as p rises"
+  }
+}

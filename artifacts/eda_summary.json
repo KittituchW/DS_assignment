@@ -1,0 +1,174 @@
+{
+  "raw_rows": {
+    "movie": 16000,
+    "tv": 16000
+  },
+  "rows_per_type_and_year": [
+    1000
+  ],
+  "show_id_shared_across_files": 397,
+  "tv_show_id_repeats": 9,
+  "catalogue_items": 31915,
+  "recommendable_items": 22059,
+  "funnel": {
+    "raw rows": {
+      "movie": 16000,
+      "tv": 16000
+    },
+    "after de-duplication": {
+      "movie": 15963,
+      "tv": 15952
+    },
+    "has genre or description": {
+      "movie": 15946,
+      "tv": 15464
+    },
+    "at least 5 votes": {
+      "movie": 14479,
+      "tv": 7741
+    },
+    "adult keyword filter": {
+      "movie": 14353,
+      "tv": 7706
+    }
+  },
+  "recommendable_movie_share": 0.651,
+  "rating_equals_vote_average": true,
+  "movie_duration_missing_pct": 100.0,
+  "tv_duration_values": [
+    "1 Seasons"
+  ],
+  "votes_by_type": {
+    "movie": {
+      "zero_share": 0.056,
+      "below_min_votes_share": 0.093,
+      "median": 138.0
+    },
+    "tv": {
+      "zero_share": 0.229,
+      "below_min_votes_share": 0.514,
+      "median": 4.0
+    }
+  },
+  "mean_vote_average_by_type_min_votes": {
+    "movie": 6.33,
+    "tv": 7.2
+  },
+  "median_genres_per_title": 2.0,
+  "non_english_share_catalogue": 0.563,
+  "non_english_share_recommendable": 0.451,
+  "non_english_share_by_type_recommendable": {
+    "movie": 0.379,
+    "tv": 0.585
+  },
+  "english_share_least_popular_decile": 0.476,
+  "english_share_most_popular_decile": 0.659,
+  "popularity_pct_median_by_year": {
+    "2010": 0.33,
+    "2011": 0.35,
+    "2012": 0.41,
+    "2013": 0.47,
+    "2014": 0.48,
+    "2015": 0.47,
+    "2016": 0.51,
+    "2017": 0.54,
+    "2018": 0.57,
+    "2019": 0.55,
+    "2020": 0.45,
+    "2021": 0.49,
+    "2022": 0.59,
+    "2023": 0.65,
+    "2024": 0.77,
+    "2025": 0.85
+  },
+  "description_mostly_non_latin_share": 0.0,
+  "cast_link_share": 0.919,
+  "persona_pools": [
+    {
+      "persona": "action",
+      "main_genre": "Action",
+      "titles": 4604,
+      "language": null,
+      "titles_in_language": NaN
+    },
+    {
+      "persona": "kdrama",
+      "main_genre": "Romance",
+      "titles": 2113,
+      "language": "ko",
+      "titles_in_language": 123.0
+    },
+    {
+      "persona": "anime",
+      "main_genre": "Animation",
+      "titles": 3335,
+      "language": "ja",
+      "titles_in_language": 1629.0
+    },
+    {
+      "persona": "family",
+      "main_genre": "Family",
+      "titles": 2286,
+      "language": null,
+      "titles_in_language": NaN
+    },
+    {
+      "persona": "horror",
+      "main_genre": "Horror",
+      "titles": 2242,
+      "language": null,
+      "titles_in_language": NaN
+    },
+    {
+      "persona": "documentary",
+      "main_genre": "Documentary",
+      "titles": 1075,
+      "language": null,
+      "titles_in_language": NaN
+    },
+    {
+      "persona": "scifi",
+      "main_genre": "Science Fiction",
+      "titles": 2917,
+      "language": null,
+      "titles_in_language": NaN
+    },
+    {
+      "persona": "crime",
+      "main_genre": "Crime",
+      "titles": 2694,
+      "language": null,
+      "titles_in_language": NaN
+    },
+    {
+      "persona": "comedy",
+      "main_genre": "Comedy",
+      "titles": 7070,
+      "language": null,
+      "titles_in_language": NaN
+    },
+    {
+      "persona": "cdrama",
+      "main_genre": "Drama",
+      "titles": 10400,
+      "language": "zh",
+      "titles_in_language": 590.0
+    }
+  ],
+  "missing_pct_by_type": {
+    "Movie": {
+      "director": 0.8,
+      "cast": 1.3,
+      "country": 2.9,
+      "genres": 0.7,
+      "description": 0.8
+    },
+    "TV Show": {
+      "director": 68.5,
+      "cast": 7.2,
+      "country": 11.2,
+      "genres": 6.1,
+      "description": 20.0
+    }
+  }
+}
