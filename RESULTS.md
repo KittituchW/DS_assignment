@@ -174,5 +174,7 @@ documentary viewer. They pass the keyword filter because they have more than
 2. Pretrained sentence encoder for the text block.
 3. Coverage: a diversity re-rank such as MMR, or one vector per interest
    cluster.
-4. With real logs: replace the simulator, then run an online A/B test on watch
+4. Simulate watch completion (a watch ratio per event) and evaluate on
+   completed watches, which is closer to a business metric.
+5. With real logs: replace the simulator, then run an online A/B test on watch
    completion with non-English exposure as a guardrail.

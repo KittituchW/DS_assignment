@@ -90,7 +90,11 @@ in its Deviations section.
    non-English share of the top 10 minus each viewer's held-out share, at
    three levels of popularity bias.
 
-**Simulator.** 3,000 viewers per dataset. Each has one of 10 personas (such as
+**Simulator.** It builds on the simulator from my earlier ML engineering
+assignment on the same dataset (same persona and genre-taste structure) and
+adds two parts the hypotheses need: a text anchor, so H1 has a text signal to
+find, and a popularity dial `p`, so H2 can be tested at several levels of herd
+behaviour. 3,000 viewers per dataset. Each has one of 10 personas (such as
 action, K-drama, anime, documentary), a genre taste drawn around that
 persona, one anchor title for text taste, and a language boost for some
 personas. A title's chance of being watched is genre affinity squared, times
