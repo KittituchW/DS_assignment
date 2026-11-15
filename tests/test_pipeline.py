@@ -59,10 +59,13 @@ def test_all_stages_run_and_write_their_outputs(tmp_path, monkeypatch) -> None:
     for name in (
         "eda_summary.json", "eda_schema.csv", "metrics_all_runs.csv", "hypothesis_tests.json",
         "results_summary.md", "h2_non_english_gap.png", "h1_text_ablation.png", "sample_recommendations.md",
+        "eda_cleaning_funnel.png", "eda_vote_counts.png", "eda_vote_average_by_type.png",
+        "eda_language_by_type.png", "eda_persona_pools.png", "eda_popularity_by_year.png",
     ):
         assert (out / name).exists(), name
     tests = json.loads((out / "hypothesis_tests.json").read_text())
     assert tests["H1"]["verdict"] in {"supported", "rejected: text hurts", "inconclusive"}
     assert tests["H2"]["h2b_verdict"] in {"supported", "not supported"}
     runs = (out / "metrics_all_runs.csv").read_text()
-    assert "two_tower_no_text" in runs and "content_knn_text_only" in runs
+    assert "two_tower_no_text" in runs and "content_knn_text_only" in runs and "popularity_by_type" in runs
+    assert tests["H2"]["by_type_at_main_exponent"][-1]["model"] == "held-out watches"

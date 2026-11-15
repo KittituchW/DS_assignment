@@ -52,25 +52,35 @@ serving needs only the item table and numpy. PyTorch is used in training only.
 
 `artifacts/eda_schema.csv` lists every column with its type, missing share by
 content type, and meaning. `artifacts/eda_summary.json` holds the statistics.
-The findings that shaped the design:
+Each EDA figure states its finding in the title. The findings that shaped the
+design:
 
-| Finding | Decision |
-|---|---|
-| Two files, 16,000 rows each. No viewer, event or rating table. `popularity`, `vote_count` and `vote_average` are global TMDb aggregates | Simulate viewers; use TMDb signals as item features and as the popularity baseline |
-| `show_id` collides across files (397 ids) and repeats inside TV (9 ids) | Item key is `movie_<id>` or `tv_<id>`; keep the most complete duplicate |
-| Exactly 1,000 titles per type and year | A stratified sample, not the real catalogue; no claims about catalogue growth |
-| `rating` copies `vote_average`; `duration` is empty for movies and constant for TV | Both dropped |
-| TV and movie genre vocabularies differ | TV labels mapped onto the movie set |
-| TV metadata is weaker: 68.5% of TV directors and 20% of TV descriptions are missing | Text is one named feature group, so its value can be tested (H1) |
-| 56% of titles are non-English, but English share rises from 48% in the least popular decile to 66% in the most popular | Motivates H2 |
-| No maturity rating; a low-vote adult cluster exists | Titles with fewer than 5 votes and a bounded keyword list are not recommendable (known to be incomplete) |
+| Finding | Figure | Decision |
+|---|---|---|
+| Two files, 16,000 rows each. No viewer, event or rating table. `popularity`, `vote_count` and `vote_average` are global TMDb aggregates | | Simulate viewers; use TMDb signals as item features and as the popularity baseline |
+| `show_id` collides across files (397 ids) and repeats inside TV (9 ids) | | Item key is `movie_<id>` or `tv_<id>`; keep the most complete duplicate |
+| Exactly 1,000 titles per type and year | | A stratified sample, not the real catalogue; no claims about catalogue growth |
+| `rating` copies `vote_average`; `duration` is empty for movies and constant for TV | | Both dropped |
+| TV and movie genre vocabularies differ | | TV labels mapped onto the movie set |
+| 51% of TV titles have fewer than 5 votes (median 4), against 9% of movies | `eda_vote_counts.png`, `eda_cleaning_funnel.png` | Keep the 5-vote minimum (no evidence of being watched), and state that recommendable titles become 65% movies |
+| A substring keyword filter removed mainstream titles: "lover" inside *10 Cloverfield Lane*, "lust" inside *Wanderlust* | `eda_cleaning_funnel.png` | Whole-word keywords, checked only on titles with fewer than 100 votes. Logged as a deviation in `HYPOTHESES.md` |
+| TV metadata is weaker: 68.5% of TV directors and 20% of TV descriptions are missing | `eda_missingness.png` | Text is one named feature group, so its value can be tested (H1) |
+| Descriptions are in English for every original language | `eda_summary.json` | English TF-IDF is a fair text baseline |
+| 56% of titles are non-English, but English share rises from 48% in the least popular decile to 66% in the most popular | `eda_english_share_by_popularity.png` | Motivates H2 |
+| TV is 58% non-English, movies 38% | `eda_language_by_type.png` | Read H2 within each content type as well |
+| TV titles score about one point higher than movies (7.2 against 6.3) | `eda_vote_average_by_type.png` | The popularity baseline leans to TV; an exploratory type-balanced version checks H2a |
+| Movie popularity rises steadily with release year | `eda_popularity_by_year.png` | Popularity is a 2025 snapshot that partly means "new". Production needs popularity measured at event time |
+| Persona pools differ in size: 123 Korean romance titles against 10,400 drama titles | `eda_persona_pools.png` | A simulator limitation, stated with the results |
+| 92% of titles share a lead cast member with another title | `eda_summary.json` | Cast is a relationship the model does not use yet; a candidate feature for the next iteration |
+| No maturity rating | | The keyword filter is known to be incomplete; production needs a licensed maturity feed |
 
-Clean catalogue: 31,915 titles, 21,917 recommendable.
+Clean catalogue: 31,915 titles, 22,059 recommendable.
 
 ## 3. Research design
 
 Full text, reasons and decision rules: [`HYPOTHESES.md`](HYPOTHESES.md). It was
-committed before the final run.
+committed before the final run. Changes made after that, and why, are listed
+in its Deviations section.
 
 1. **H1.** Description text adds signal beyond genre and metadata. Test: the
    two tower with and without the text features, 5 seeds, paired bootstrap
@@ -100,6 +110,7 @@ times the language boost. `p` is the popularity bias dial: 2, 6 and 12.
 **Baselines (`src/recommender/evaluation.py`), no learning.**
 
 1. Popularity: weighted rating times popularity percentile, same list for all.
+   An exploratory version ranks the rating within type instead (see the EDA).
 2. Most watched: the most watched titles among simulated viewers in training.
 3. Content kNN: a viewer is the mean of the feature rows they watched; rank by
    cosine. Also run on text features only and without text.
@@ -143,6 +154,7 @@ src/recommender/simulate.py    persona-based viewer simulator
 src/recommender/two_tower.py   two tower model and training loop       (model training, the only torch import)
 src/recommender/evaluation.py  split, metrics, baselines, bootstrap    (evaluation)
 src/recommender/analysis.py    H1/H2 decision rules, tables, figures, sample recommendations
+src/recommender/plotting.py    shared chart style (validated colour-blind-safe palette)
 run_experiment.py              runs the stages in order
 tests/                         unit tests and an end-to-end pipeline test
 notebooks/                     walkthrough of the generated results
@@ -157,7 +169,7 @@ committed because the run regenerates it.
 
 | File | Content |
 |---|---|
-| `eda_schema.csv`, `eda_summary.json`, `eda_*.png` | Exploration |
+| `eda_schema.csv`, `eda_summary.json`, `eda_*.png` | Exploration (nine figures, one per finding) |
 | `metrics_all_runs.csv` | Every model run at every `p` and seed |
 | `hypothesis_tests.json`, `results_summary.md` | H1 and H2 numbers and verdicts |
 | `h1_text_ablation.png`, `h2_non_english_gap.png` | Hypothesis figures |
@@ -168,18 +180,25 @@ committed because the run regenerates it.
 
 1. The simulator defines the ground truth. Any model that learns genre and
    popularity looks good on it. H1 is designed so those signals cancel out.
-2. No real behaviour, so no estimate of real watch lift.
-3. The adult filter is a keyword list. Production needs a licensed maturity
+2. Persona pools differ a lot in size, so some personas are easier to predict
+   than others.
+3. No real behaviour, so no estimate of real watch lift.
+4. The vote filter makes the recommendable catalogue 65% movies.
+5. The adult filter is a keyword list. Production needs a licensed maturity
    and rights feed.
-4. Mean pooling ignores recency and order in the history.
+6. Popularity is a 2025 snapshot used for 2023 to 2025 events. The simulator
+   uses the same snapshot, so results are consistent but optimistic.
+7. Mean pooling ignores recency and order in the history.
 
 In production:
 
 1. Replace the simulator with logged impressions and watches behind the same
    history matrix. Nothing downstream changes.
-2. Swap the TF-IDF text block for a pretrained multilingual sentence encoder.
-   Only the item tower's input size changes.
-3. Serve with approximate nearest neighbour search over the item table. The
+2. Swap the TF-IDF text block for a pretrained sentence encoder. Descriptions
+   are in English, so an English model is enough for them. Only the item
+   tower's input size changes.
+3. Add cast and director links as features.
+4. Serve with approximate nearest neighbour search over the item table. The
    viewer vector is a mean, so it can update per event.
-4. Test online with an A/B or interleaving test on watch completion, with
+5. Test online with an A/B or interleaving test on watch completion, with
    non-English exposure as a guardrail.

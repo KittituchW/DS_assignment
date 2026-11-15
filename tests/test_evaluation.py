@@ -42,6 +42,8 @@ def test_metrics_on_a_known_example() -> None:
     assert m["ndcg"][0] == pytest.approx((1 / np.log2(3)) / (1 + 1 / np.log2(3)))
     assert m["non_en"][0] == pytest.approx(1 / 3)
     assert m["heldout_non_en"][0] == pytest.approx(0.5)
+    assert (m["rec_movie"][0], m["rec_movie_non_en"][0], m["rec_tv"][0], m["rec_tv_non_en"][0]) == (2, 0, 1, 1)
+    assert (m["heldout_movie"][0], m["heldout_tv"][0], m["heldout_tv_non_en"][0]) == (0, 2, 1)
 
 
 def test_bootstrap_of_a_constant_is_that_constant() -> None:

@@ -15,9 +15,13 @@ Cleaning decisions (each one comes from an EDA finding, see `eda.py`):
 5. Budget and revenue of 0 mean "unknown". They become missing values.
 6. TV genre labels are mapped onto the movie genre vocabulary.
 7. Titles with no genre and no description, titles with fewer than
-   `MIN_VOTES` votes, and a bounded adult keyword list are kept in the table
-   but flagged `recommendable = False`. The data has no maturity rating, so
-   this filter is known to be incomplete.
+   `MIN_VOTES` votes, and low-vote titles that match an adult keyword list are
+   kept in the table but flagged `recommendable = False`, with one column per
+   reason. Keywords match whole words only, and only titles with fewer than
+   `ADULT_MAX_VOTES` votes are checked: EDA showed that substring matching
+   removed mainstream titles ("lover" inside "10 Cloverfield Lane", "lust"
+   inside "Wanderlust"), while the adult cluster sits in low-vote titles. The
+   data has no maturity rating, so this filter is known to be incomplete.
 8. Popularity becomes a percentile within type, because movie and TV
    popularity use different scales.
 9. A Bayesian weighted rating shrinks low-vote averages towards the mean.
@@ -26,6 +30,7 @@ Cleaning decisions (each one comes from an EDA finding, see `eda.py`):
 from __future__ import annotations
 
 import hashlib
+import re
 import urllib.request
 from pathlib import Path
 
@@ -58,6 +63,8 @@ GENRE_MAP: dict[str, list[str]] = {
 MIN_VOTES = 5
 
 # Bounded keyword list for a low-vote adult cluster. Not a maturity system.
+# Titles with at least ADULT_MAX_VOTES votes are treated as mainstream and kept.
+ADULT_MAX_VOTES = 100
 ADULT_TITLE_KEYWORDS = [
     "sister-in-law", "mom's friend", "housemate's wife", "older sister", "seduction",
     "an affair", "secretary wants", "taste of a", "sex education for", "young mother",
@@ -67,6 +74,7 @@ ADULT_TITLE_KEYWORDS = [
     r"\bsex\b", "desire", "bosomy", "x-rated", "clitoris", "nasty", "adult", "lesson",
     "neighbor's wife", "neighbour's wife", "lust", "pleasure", "virgin", "lover",
 ]
+ADULT_PATTERN = "|".join(k if k.startswith(r"\b") else rf"\b{re.escape(k)}\b" for k in ADULT_TITLE_KEYWORDS)
 
 
 def file_sha256(path: Path) -> str:
@@ -161,15 +169,16 @@ def build_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
     df["title"] = df["title"].fillna("").astype(str)
     df["language"] = df["language"].fillna("unknown").astype(str)
 
-    # 7: recommendable flag
-    has_content = df["genres"].map(len).gt(0) | df["description"].str.len().gt(0)
-    has_votes = df["vote_count"].fillna(0) >= MIN_VOTES
-    adult = df["title"].str.lower().str.contains("|".join(ADULT_TITLE_KEYWORDS), regex=True)
-    df["recommendable"] = has_content & has_votes & ~adult
+    # 7: recommendable flag, one column per reason
+    df["vote_count"] = df["vote_count"].fillna(0).astype(int)
+    df["excluded_no_content"] = df["genres"].map(len).eq(0) & df["description"].str.len().eq(0)
+    df["excluded_low_votes"] = df["vote_count"] < MIN_VOTES
+    keyword = df["title"].str.lower().str.contains(ADULT_PATTERN, regex=True)
+    df["excluded_adult_keyword"] = keyword & (df["vote_count"] < ADULT_MAX_VOTES)
+    df["recommendable"] = ~(df["excluded_no_content"] | df["excluded_low_votes"] | df["excluded_adult_keyword"])
 
     # 8 and 9
     df["popularity"] = df["popularity"].fillna(0.0)
-    df["vote_count"] = df["vote_count"].fillna(0).astype(int)
     df["popularity_pct"] = df.groupby("type")["popularity"].rank(pct=True)
     df["weighted_rating"] = bayesian_rating(df["vote_average"], df["vote_count"])
     df["date_added"] = pd.to_datetime(df["date_added"], errors="coerce")
@@ -179,7 +188,8 @@ def build_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
         "item_id", "type", "show_id", "title", "director", "cast", "country", "language",
         "is_english", "date_added", "release_year", "genres", "description", "popularity",
         "popularity_pct", "vote_count", "vote_average", "weighted_rating", "budget", "revenue",
-        "has_financials", "metadata_completeness", "recommendable",
+        "has_financials", "metadata_completeness", "excluded_no_content", "excluded_low_votes",
+        "excluded_adult_keyword", "recommendable",
     ]
     return df[cols].sort_values("item_id").reset_index(drop=True)
 

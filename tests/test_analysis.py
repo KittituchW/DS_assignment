@@ -16,6 +16,10 @@ def _save(run_dir, model, p, seed, recall, non_en):
         "non_en": non_en,
         "tv": np.full(N, 0.3),
         "heldout_non_en": HELDOUT,
+        "rec_movie": np.full(N, 7), "rec_movie_non_en": np.full(N, 2),
+        "rec_tv": np.full(N, 3), "rec_tv_non_en": np.full(N, 2),
+        "heldout_movie": np.full(N, 3), "heldout_movie_non_en": np.full(N, 1),
+        "heldout_tv": np.full(N, 2), "heldout_tv_non_en": np.full(N, 1),
     }
     save_run(run_dir, model, p, seed, {"recall@10": float(recall.mean())}, per_user)
 
@@ -54,6 +58,9 @@ def test_h2_rules(tmp_path) -> None:
     result = check_h2(tmp_path, [2, 6], 6, [1, 2])
     assert result["h2a_verdict"] == "supported"
     assert result["h2b_verdict"] == "supported"
+    by_type = {row["model"]: row for row in result["by_type_at_main_exponent"]}
+    assert by_type["popularity"]["tv_share"] == 0.3
+    assert by_type["held-out watches"]["non_en_within_tv"] == 0.5
 
     _save(tmp_path, "two_tower", 2, 1, zeros, HELDOUT - 0.2)  # now far below the held-out share
     assert check_h2(tmp_path, [2, 6], 6, [1, 2])["h2b_verdict"] == "not supported"

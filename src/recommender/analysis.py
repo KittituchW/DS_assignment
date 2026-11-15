@@ -15,11 +15,14 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
+from recommender import plotting
 from recommender.evaluation import Scorer, paired_bootstrap, top_k
 
 H2A_MAX_GAP = -0.10  # popularity gap must sit below -10 points
 H2B_BAND = 0.05  # two tower gap must sit inside +/- 5 points
 BOOTSTRAP_SAMPLES = 2000
+H2_MODELS = ["popularity", "most_watched", "content_knn", "two_tower"]
+EXPLORATORY_MODELS = ["popularity_by_type"]  # added after EDA; reported, never part of a verdict
 
 
 # ------------------------------------------------------------------ run storage
@@ -109,18 +112,46 @@ def _gap(run_dir: Path, model: str, exponent: float, seeds: list[int | None]) ->
     }
 
 
+def h2_by_type(run_dir: Path, exponent: float, seeds_by_model: dict[str, list[int | None]]) -> list[dict]:
+    """Pooled shares within each content type, to separate a language effect from a type-mix effect."""
+
+    def share(numerator: float, denominator: float) -> float:
+        return numerator / denominator if denominator else float("nan")
+
+    rows, held = [], None
+    for model, model_seeds in seeds_by_model.items():
+        runs = [load_run(run_dir, model, exponent, s) for s in model_seeds]
+        if any(r is None or "rec_tv" not in r for r in runs):
+            continue
+        total = {key: float(sum(r[key].sum() for r in runs)) for key in runs[0] if key.startswith(("rec_", "heldout_")) and key != "heldout_non_en"}
+        held = held or total
+        rows.append(
+            {
+                "model": model,
+                "tv_share": share(total["rec_tv"], total["rec_tv"] + total["rec_movie"]),
+                "non_en_within_movies": share(total["rec_movie_non_en"], total["rec_movie"]),
+                "non_en_within_tv": share(total["rec_tv_non_en"], total["rec_tv"]),
+            }
+        )
+    if held:
+        rows.append(
+            {
+                "model": "held-out watches",
+                "tv_share": share(held["heldout_tv"], held["heldout_tv"] + held["heldout_movie"]),
+                "non_en_within_movies": share(held["heldout_movie_non_en"], held["heldout_movie"]),
+                "non_en_within_tv": share(held["heldout_tv_non_en"], held["heldout_tv"]),
+            }
+        )
+    return rows
+
+
 def check_h2(run_dir: Path, exponents: list[float], main_exponent: float, seeds: list[int]) -> dict:
     rows = []
     for p in exponents:
         tt_seeds = seeds if p == main_exponent else seeds[:1]
         row = {"exponent": p}
-        for model, model_seeds in (
-            ("popularity", [None]),
-            ("most_watched", [None]),
-            ("content_knn", [None]),
-            ("two_tower", tt_seeds),
-        ):
-            row[model] = _gap(run_dir, model, p, model_seeds)
+        for model in H2_MODELS + EXPLORATORY_MODELS:
+            row[model] = _gap(run_dir, model, p, tt_seeds if model == "two_tower" else [None])
         row["two_tower_seeds"] = tt_seeds
         rows.append(row)
 
@@ -135,10 +166,13 @@ def check_h2(run_dir: Path, exponents: list[float], main_exponent: float, seeds:
         h2b = "supported" if all(tt_ok) else "not supported"
         gaps = [r["two_tower"]["gap"]["mean"] for r in sorted(rows, key=lambda r: r["exponent"])]
         trend = "falls as p rises (learned the popularity bias)" if all(np.diff(gaps) < 0) else "does not fall steadily as p rises"
+    seeds_by_model = {m: ([None] if m != "two_tower" else seeds) for m in H2_MODELS + EXPLORATORY_MODELS}
     return {
         "rule_h2a": f"popularity gap upper bound below {H2A_MAX_GAP * 100:+.0f} points at every p",
         "rule_h2b": f"two tower gap interval inside +/-{H2B_BAND * 100:.0f} points at every p",
+        "exploratory_models": EXPLORATORY_MODELS,
         "by_exponent": rows,
+        "by_type_at_main_exponent": h2_by_type(run_dir, main_exponent, seeds_by_model),
         "h2a_verdict": h2a,
         "h2b_verdict": h2b,
         "two_tower_gap_trend": trend,
@@ -239,61 +273,73 @@ def results_summary(runs: pd.DataFrame, h1: dict, h2: dict) -> str:
     ]
     table = []
     for row in h2["by_exponent"]:
-        ref = next((row[m]["heldout_non_en"] for m in ("popularity", "two_tower") if row[m]), float("nan"))
-        table.append(
-            {
-                "p": f"{row['exponent']:g}",
-                "held-out non-English": f"{ref:.1%}",
-                **{m: _pts(row[m]["gap"] if row[m] else None) for m in ("popularity", "most_watched", "content_knn", "two_tower")},
-            }
-        )
+        ref = next((row[m]["heldout_non_en"] for m in H2_MODELS if row[m]), float("nan"))
+        entry = {"p": f"{row['exponent']:g}", "held-out non-English": f"{ref:.1%}"}
+        entry.update({m: _pts(row[m]["gap"] if row[m] else None) for m in H2_MODELS})
+        entry.update({f"{m} (exploratory)": _pts(row[m]["gap"] if row[m] else None) for m in EXPLORATORY_MODELS})
+        table.append(entry)
     lines += [markdown_table(pd.DataFrame(table)), ""]
+    if h2["by_type_at_main_exponent"]:
+        by_type = pd.DataFrame(h2["by_type_at_main_exponent"])
+        for col in ("tv_share", "non_en_within_movies", "non_en_within_tv"):
+            by_type[col] = by_type[col].map(lambda v: "" if pd.isna(v) else f"{v:.1%}")
+        lines += [
+            "### Reading H2 within each content type (exploratory)",
+            "",
+            "TV is mostly non-English and movies mostly English, so a list's non-English share also depends on its",
+            "TV share. Pooled over viewers at the main p.",
+            "",
+            markdown_table(by_type),
+            "",
+        ]
     return "\n".join(lines)
 
 
 def save_figures(h1: dict, h2: dict, output: Path) -> None:
-    import matplotlib
-
-    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    colours = {"popularity": "#9ca3af", "most_watched": "#d97706", "content_knn": "#4a90c2", "two_tower": "#1f4e79"}
+    plotting.apply_style()
+    models = [m for m in H2_MODELS + EXPLORATORY_MODELS if any(r[m] for r in h2["by_exponent"])]
     rows = sorted(h2["by_exponent"], key=lambda r: r["exponent"])
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    width = 0.2
-    for i, model in enumerate(colours):
-        xs, ys, errs = [], [], []
+    fig, ax = plt.subplots(figsize=(9, 4.8))
+    width = 0.8 / max(len(models), 1)
+    for i, model in enumerate(models):
+        xs, ys, lo, hi = [], [], [], []
         for j, row in enumerate(rows):
             if row[model] is None:
                 continue
             gap = row[model]["gap"]
-            xs.append(j + (i - 1.5) * width)
+            xs.append(j + (i - (len(models) - 1) / 2) * width)
             ys.append(gap["mean"] * 100)
-            errs.append([[(gap["mean"] - gap["ci_low"]) * 100], [(gap["ci_high"] - gap["mean"]) * 100]])
-        if xs:
-            yerr = np.hstack(errs) if errs else None
-            ax.bar(xs, ys, width, yerr=yerr, color=colours[model], label=model.replace("_", " "), capsize=3)
-    ax.axhspan(-H2B_BAND * 100, H2B_BAND * 100, color="#16a34a", alpha=0.12, label="H2b band")
-    ax.axhline(0, color="black", linewidth=0.8)
+            lo.append((gap["mean"] - gap["ci_low"]) * 100)
+            hi.append((gap["ci_high"] - gap["mean"]) * 100)
+        label = model.replace("_", " ") + (" (exploratory)" if model in EXPLORATORY_MODELS else "")
+        bars = ax.bar(xs, ys, width, yerr=[lo, hi], color=plotting.MODEL_COLOURS[model], label=label,
+                      error_kw={"ecolor": plotting.INK_SECONDARY, "elinewidth": 1, "capsize": 2}, **plotting.BAR)
+        plotting.label_bars(ax, bars, "{:+.0f}", offset=8)
+    ax.axhspan(-H2B_BAND * 100, H2B_BAND * 100, color=plotting.GRID, alpha=0.6, zorder=0)
+    ax.annotate("H2b band", (len(rows) - 0.55, H2B_BAND * 100), xytext=(0, 2), textcoords="offset points", fontsize=8, color=plotting.INK_SECONDARY)
+    ax.axhline(0, color=plotting.INK_SECONDARY, linewidth=1)
     ax.set_xticks(range(len(rows)), [f"p = {r['exponent']:g}" for r in rows])
-    ax.set(ylabel="Non-English share of top 10 minus held-out share (pts)", title="H2: who under-serves non-English titles")
-    ax.legend(fontsize=8, ncol=2)
-    plt.tight_layout()
-    plt.savefig(Path(output) / "h2_non_english_gap.png", dpi=160)
-    plt.close()
+    ax.set(ylabel="Top-10 non-English share minus held-out (pts)", title="H2: how far each model is from the non-English share viewers watch")
+    ax.legend(fontsize=8, ncol=3, loc="lower center", bbox_to_anchor=(0.5, -0.32))
+    plotting.save(fig, Path(output) / "h2_non_english_gap.png")
 
     if "per_seed" not in h1:
         return
     seeds = pd.DataFrame(h1["per_seed"])
-    fig, ax = plt.subplots(figsize=(6, 4.5))
-    for col, colour, label in (("recall@10_full", "#1f4e79", "with text"), ("recall@10_no_text", "#d97706", "no text")):
-        ax.scatter([label] * len(seeds), seeds[col], color=colour, s=40, zorder=3)
-        ax.hlines(seeds[col].mean(), -0.2 if label == "with text" else 0.8, 0.2 if label == "with text" else 1.2, color=colour)
+    fig, ax = plt.subplots(figsize=(6.5, 4.5))
+    for pos, (col, label, colour) in enumerate(
+        (("recall@10_full", "with text", plotting.SERIES[0]), ("recall@10_no_text", "without text", plotting.SERIES[1]))
+    ):
+        ax.scatter([pos] * len(seeds), seeds[col], color=colour, s=48, zorder=3, edgecolor=plotting.SURFACE, linewidth=2)
+        ax.hlines(seeds[col].mean(), pos - 0.18, pos + 0.18, color=colour, linewidth=2)
+        ax.annotate(f"mean {seeds[col].mean():.4f}", (pos + 0.2, seeds[col].mean()), va="center", fontsize=8, color=plotting.INK_SECONDARY)
+    ax.set_xticks([0, 1], ["with text", "without text"])
+    ax.set_xlim(-0.5, 1.8)
     diff = h1["recall@10_difference"]
     ax.set(
-        ylabel="Recall@10 per seed",
-        title=f"H1: difference {diff['mean'] * 100:+.2f} pts, 95% CI [{diff['ci_low'] * 100:+.2f}, {diff['ci_high'] * 100:+.2f}]",
+        ylabel="Recall@10 (one dot per seed)",
+        title=f"H1: {h1['verdict']}. Difference {diff['mean'] * 100:+.2f} pts\n95% CI [{diff['ci_low'] * 100:+.2f}, {diff['ci_high'] * 100:+.2f}]",
     )
-    plt.tight_layout()
-    plt.savefig(Path(output) / "h1_text_ablation.png", dpi=160)
-    plt.close()
+    plotting.save(fig, Path(output) / "h1_text_ablation.png")

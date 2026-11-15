@@ -9,6 +9,8 @@ Metrics at k, computed per viewer so they can be bootstrapped:
     non_en@k        share of the top k that is non-English
     tv@k            share of the top k that is TV
     heldout_non_en  share of the viewer's held-out items that is non-English (H2 reference)
+    counts          movie/TV and non-English counts in the top k and in the held-out items,
+                    pooled later to read H2 within each content type
 Catalogue level:
     coverage@k      share of recommendable items that appear in anyone's top k
 
@@ -82,10 +84,11 @@ def recommend(scorer: Scorer, history: sparse.csr_matrix, k: int = 10, block: in
 
 
 def per_user_metrics(recs: np.ndarray, test: sparse.csr_matrix, items: pd.DataFrame, k: int = 10) -> dict[str, np.ndarray]:
-    non_en_item = (~items["is_english"].to_numpy()).astype(float)
-    tv_item = items["type"].eq("tv").to_numpy().astype(float)
+    non_en_item = (~items["is_english"].to_numpy()).astype(bool)
+    tv_item = items["type"].eq("tv").to_numpy()
     discounts = 1.0 / np.log2(np.arange(2, k + 2))
     recall, ndcg, heldout = [], [], []
+    held_counts = np.zeros((recs.shape[0], 4), dtype=np.int32)  # movie, movie non-EN, tv, tv non-EN
     for u in range(recs.shape[0]):
         relevant = test.indices[test.indptr[u] : test.indptr[u + 1]]
         hits = np.isin(recs[u, :k], relevant).astype(float)
@@ -93,12 +96,23 @@ def per_user_metrics(recs: np.ndarray, test: sparse.csr_matrix, items: pd.DataFr
         recall.append(hits.sum() / n_rel)
         ndcg.append((hits * discounts).sum() / discounts[: min(n_rel, k)].sum())
         heldout.append(non_en_item[relevant].mean() if len(relevant) else np.nan)
+        is_tv, is_non_en = tv_item[relevant], non_en_item[relevant]
+        held_counts[u] = [(~is_tv).sum(), (~is_tv & is_non_en).sum(), is_tv.sum(), (is_tv & is_non_en).sum()]
+    top_tv, top_non_en = tv_item[recs[:, :k]], non_en_item[recs[:, :k]]
     return {
         "recall": np.asarray(recall),
         "ndcg": np.asarray(ndcg),
-        "non_en": non_en_item[recs[:, :k]].mean(axis=1),
-        "tv": tv_item[recs[:, :k]].mean(axis=1),
+        "non_en": top_non_en.mean(axis=1),
+        "tv": top_tv.mean(axis=1),
         "heldout_non_en": np.asarray(heldout),
+        "rec_movie": (~top_tv).sum(axis=1),
+        "rec_movie_non_en": (~top_tv & top_non_en).sum(axis=1),
+        "rec_tv": top_tv.sum(axis=1),
+        "rec_tv_non_en": (top_tv & top_non_en).sum(axis=1),
+        "heldout_movie": held_counts[:, 0],
+        "heldout_movie_non_en": held_counts[:, 1],
+        "heldout_tv": held_counts[:, 2],
+        "heldout_tv_non_en": held_counts[:, 3],
     }
 
 
@@ -136,6 +150,18 @@ def paired_bootstrap(diff: np.ndarray, n: int = 2000, seed: int = 0) -> tuple[fl
 def popularity_scorer(items: pd.DataFrame) -> Scorer:
     """Same list for everyone: weighted rating times popularity percentile (TMDb signals)."""
     base = (items["weighted_rating"] * items["popularity_pct"]).to_numpy(dtype=np.float32)
+    return lambda history: np.tile(base, (history.shape[0], 1))
+
+
+def popularity_by_type_scorer(items: pd.DataFrame) -> Scorer:
+    """Exploratory check, not part of the H2 rule: rating as a percentile within type.
+
+    EDA showed TV titles score about one point higher than movies, so the raw
+    weighted rating pushes the popularity list towards TV. This version puts
+    both types on the same scale.
+    """
+    rating_pct = items.groupby("type")["weighted_rating"].rank(pct=True)
+    base = (rating_pct * items["popularity_pct"]).to_numpy(dtype=np.float32)
     return lambda history: np.tile(base, (history.shape[0], 1))
 
 

@@ -87,8 +87,9 @@ def _multi_hot(lists: pd.Series) -> np.ndarray:
 def text_embeddings(items: pd.DataFrame, dims: int = TEXT_DIMS, seed: int = 42) -> np.ndarray:
     """TF-IDF over title and description, then truncated SVD.
 
-    A pretrained multilingual sentence encoder is the planned upgrade. Only the
-    input size of the item tower would change.
+    A pretrained sentence encoder is the planned upgrade. Descriptions are in
+    English for every original language, so an English model is enough. Only
+    the input size of the item tower would change.
     """
     docs = items["title"] + ". " + items["description"]
     tfidf = TfidfVectorizer(

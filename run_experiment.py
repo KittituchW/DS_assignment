@@ -2,7 +2,7 @@
 
 Stages (default: all four, in order):
     prepare    check inputs, clean catalogue, EDA, item features, simulated viewers
-    baselines  popularity, most watched, content kNN (+ text-only and no-text) on every dataset
+    baselines  popularity (+ type-balanced check), most watched, content kNN (+ text-only and no-text)
     train      two tower: H1 ablation (5 seeds at p = 6) and H2 sweep (p = 2 and 12). Needs PyTorch.
     analyse    H1 and H2 decision rules, result tables, figures, sample recommendations
 
@@ -43,6 +43,7 @@ from recommender.evaluation import (  # noqa: E402
     content_knn_scorer,
     evaluate,
     most_watched_scorer,
+    popularity_by_type_scorer,
     popularity_scorer,
     temporal_split,
     two_tower_scorer,
@@ -136,6 +137,7 @@ def stage_baselines(args: argparse.Namespace, paths: Paths) -> None:
         split = load_split(paths, p, items)
         scorers = {
             "popularity": popularity_scorer(items),
+            "popularity_by_type": popularity_by_type_scorer(items),
             "most_watched": most_watched_scorer(split.history_matrix()),
             "content_knn": content_knn_scorer(feats.matrix),
             "content_knn_text_only": content_knn_scorer(feats.columns("text")),
