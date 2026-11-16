@@ -166,6 +166,7 @@ python run_experiment.py --stages prepare baselines analyse   # no PyTorch neede
 python run_experiment.py --stages train analyse               # after prepare
 python run_experiment.py --stages tune analyse                # settings search, after train
 python run_experiment.py --stages coldstart analyse           # item cold-start test, after prepare
+python run_experiment.py --stages oracle analyse              # ceiling: the simulator's own ranking
 python run_experiment.py --min-votes 5 --output artifacts/sensitivity_min5 \
     --stages prepare baselines train analyse                  # 5-vote sensitivity run
 python run_experiment.py --stages analyse                     # rebuild tables from saved runs

@@ -101,7 +101,27 @@ def _genre_matrix(items: pd.DataFrame) -> tuple[np.ndarray, dict[str, int]]:
 
 
 def simulate(items: pd.DataFrame, cfg: SimConfig = SimConfig()) -> pd.DataFrame:
-    """Return events with columns user_id, item_id, persona, ts. `items` are the recommendable items."""
+    """Return events with columns user_id, item_id, persona, ts, watch_ratio. `items` are the recommendable items."""
+    return simulate_with_oracle(items, cfg, keep=0)[0]
+
+
+def _top(prob: np.ndarray, keep: int) -> tuple[np.ndarray, np.ndarray]:
+    keep = min(keep, len(prob))
+    idx = np.argpartition(-prob, keep - 1)[:keep]
+    idx = idx[np.argsort(-prob[idx], kind="stable")]
+    return idx.astype(np.int32), prob[idx].astype(np.float32)
+
+
+def simulate_with_oracle(
+    items: pd.DataFrame, cfg: SimConfig = SimConfig(), keep: int = 400
+) -> tuple[pd.DataFrame, dict[str, dict[str, tuple[np.ndarray, np.ndarray]]]]:
+    """Events, plus each viewer's `keep` most likely titles under the simulator's true watch chance.
+
+    The oracle is the ceiling for any model: it ranks titles by the exact rule
+    that produced the watches. `no_text` drops the favourite-title term, which
+    shows how much of the ceiling the text taste carries. Computing it adds no
+    random draws, so the events are identical to `simulate`.
+    """
     rng = np.random.default_rng(cfg.seed)
     items = items.reset_index(drop=True)
     as_of = pd.Timestamp(cfg.as_of)
@@ -116,6 +136,7 @@ def simulate(items: pd.DataFrame, cfg: SimConfig = SimConfig()) -> pd.DataFrame:
     names = list(PERSONAS)
     ratio_rng = np.random.default_rng([cfg.seed, 1])  # separate stream: the events do not change
     rows: list[tuple[str, str, str, pd.Timestamp, float]] = []
+    oracle: dict[str, dict[str, tuple[np.ndarray, np.ndarray]]] = {"full": {}, "no_text": {}}
     for u in range(cfg.users):
         user = f"u{u:05d}"
         persona_name = names[rng.integers(len(names))]
@@ -128,6 +149,7 @@ def simulate(items: pd.DataFrame, cfg: SimConfig = SimConfig()) -> pd.DataFrame:
             if g in genre_index:
                 alpha[genre_index[g]] += 30.0 * w / total
         prob = (genre_m @ rng.dirichlet(alpha) + 0.003) ** 2
+        genre_taste = prob.copy()
 
         # Taste anchor: one released title drawn from the genre taste.
         anchor_p = prob * released
@@ -138,6 +160,13 @@ def simulate(items: pd.DataFrame, cfg: SimConfig = SimConfig()) -> pd.DataFrame:
             prob[langs == lang] *= boost
         prob[~released] = 0.0
         prob /= prob.sum()
+        if keep:
+            no_text = genre_taste * pop
+            for lang, boost in persona["language"].items():
+                no_text[langs == lang] *= boost
+            no_text[~released] = 0.0
+            oracle["full"][user] = _top(prob, keep)
+            oracle["no_text"][user] = _top(no_text / no_text.sum(), keep)
 
         n = int(np.clip(rng.lognormal(cfg.lognormal_mean, cfg.lognormal_sigma), cfg.min_events, cfg.max_events))
         n = min(n, int((prob > 0).sum()))
@@ -151,4 +180,4 @@ def simulate(items: pd.DataFrame, cfg: SimConfig = SimConfig()) -> pd.DataFrame:
             rows.append((user, items["item_id"].iloc[idx], persona_name, ts, round(float(ratio), 4)))
 
     events = pd.DataFrame(rows, columns=["user_id", "item_id", "persona", "ts", "watch_ratio"])
-    return events.sort_values(["user_id", "ts"], kind="stable").reset_index(drop=True)
+    return events.sort_values(["user_id", "ts"], kind="stable").reset_index(drop=True), oracle

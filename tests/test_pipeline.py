@@ -91,3 +91,6 @@ def test_all_stages_run_and_write_their_outputs(tmp_path, monkeypatch) -> None:
     cold = tests["exploratory_cold_start"]
     assert cold["cold_items"] > 0 and set(cold["models"]) == {"two_tower", "content_knn", "popularity"}
     assert "Item cold start" in (out / "results_summary.md").read_text()
+    ceiling = tests["exploratory_oracle"]
+    assert len(ceiling) == 2 and all(0 <= row["oracle_recall@10"] <= 1 for row in ceiling)
+    assert "oracle" in runs and "Ceiling" in (out / "results_summary.md").read_text()

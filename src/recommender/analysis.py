@@ -265,6 +265,33 @@ def cold_start_summary(run_dir: Path, exponent: float, seeds: list[int]) -> dict
     return out
 
 
+def oracle_summary(run_dir: Path, exponents: list[float], main_exponent: float, seeds: list[int]) -> list[dict] | None:
+    """Exploratory: each model's Recall@10 as a share of the simulator's own ranking (the ceiling)."""
+    rows = []
+    for p in exponents:
+        oracle = load_run(run_dir, "oracle", p, None)
+        no_text = load_run(run_dir, "oracle_no_text", p, None)
+        if oracle is None or no_text is None:
+            return None
+        row = {
+            "exponent": p,
+            "oracle_recall@10": float(oracle["recall"].mean()),
+            "oracle_hit@10": float(oracle["hit"].mean()),
+            "oracle_no_text_recall@10": float(no_text["recall"].mean()),
+            "text_share_of_ceiling": float(1 - no_text["recall"].mean() / max(oracle["recall"].mean(), 1e-12)),
+        }
+        p_seeds = seeds if p == main_exponent else seeds[:1]
+        for model in ("two_tower", "content_knn", "most_watched", "popularity"):
+            runs = [load_run(run_dir, model, p, s) for s in (p_seeds if _trained(model) else [None])]
+            if any(r is None for r in runs):
+                continue
+            recall = float(np.mean([r["recall"].mean() for r in runs]))
+            row[f"{model}_recall@10"] = recall
+            row[f"{model}_share_of_ceiling"] = recall / max(row["oracle_recall@10"], 1e-12)
+        rows.append(row)
+    return rows
+
+
 # ------------------------------------------------------------------ sample recommendations
 
 
@@ -337,7 +364,7 @@ def _comparison_table(rows: list[dict]) -> str:
 
 def results_summary(
     runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dict] | None = None, tuned: dict | None = None,
-    cold: dict | None = None,
+    cold: dict | None = None, ceiling: list[dict] | None = None,
 ) -> str:
     lines = [
         "# Results summary (generated)",
@@ -431,6 +458,25 @@ def results_summary(
             "",
             "Tuned two tower non-English gap against held-out watches: "
             + ", ".join(f"p = {g['exponent']:g}: {_pts(g.get('gap'))}" for g in tuned["h2_gap"]),
+            "",
+        ]
+    if ceiling:
+        table = []
+        for row in ceiling:
+            entry = {"p": f"{row['exponent']:g}", "oracle": f"{row['oracle_recall@10']:.4f}",
+                     "oracle without text": f"{row['oracle_no_text_recall@10']:.4f}"}
+            for model in ("two_tower", "content_knn", "most_watched", "popularity"):
+                if f"{model}_recall@10" in row:
+                    entry[model] = f"{row[f'{model}_recall@10']:.4f} ({row[f'{model}_share_of_ceiling']:.0%})"
+            table.append(entry)
+        lines += [
+            "## Ceiling: the simulator's own ranking (exploratory)",
+            "",
+            "Recall@10 of the oracle, which ranks titles by each viewer's true watch chance, and each model as a",
+            "share of it. Watches are random draws, so even the oracle misses most held-out titles. The oracle",
+            "without the favourite-title term shows how much of the ceiling the text taste carries.",
+            "",
+            markdown_table(pd.DataFrame(table)),
             "",
         ]
     if cold:

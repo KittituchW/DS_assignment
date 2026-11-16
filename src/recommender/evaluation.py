@@ -20,6 +20,9 @@ Catalogue level:
 Cold start (exploratory): `cold_start_split` hides a share of titles from
 training entirely and `evaluate_cold` ranks only those titles.
 
+Oracle (exploratory): `evaluate_oracle` scores the simulator's own ranking,
+the ceiling any model can reach on these simulated viewers.
+
 A scorer maps a block of viewer history rows to a score matrix (viewers x items).
 Items a viewer already watched in training are never recommended.
 """
@@ -197,6 +200,22 @@ def summarise(per_user: dict[str, np.ndarray], recs: np.ndarray, n_items: int, k
 def evaluate(scorer: Scorer, split: Split, items: pd.DataFrame, k: int = 10) -> tuple[dict[str, float], dict[str, np.ndarray]]:
     history = split.history_matrix()
     recs = recommend(scorer, history, k)
+    per_user = per_user_metrics(recs, split.test_matrix(), items, k, ratio=split.test_ratio_matrix())
+    return summarise(per_user, recs, len(items), k), per_user
+
+
+def evaluate_oracle(
+    oracle: dict[str, tuple[np.ndarray, np.ndarray]], split: Split, items: pd.DataFrame, k: int = 10
+) -> tuple[dict[str, float], dict[str, np.ndarray]]:
+    """Score the simulator's own ranking: each viewer's most likely titles they have not watched yet."""
+    history = split.history_matrix()
+    recs = np.zeros((len(split.user_ids), k), dtype=np.int64)
+    for row, user in enumerate(split.user_ids):
+        seen = set(history.indices[history.indptr[row] : history.indptr[row + 1]].tolist())
+        ranked = [i for i in oracle[user][0].tolist() if i not in seen]
+        if len(ranked) < k:
+            raise ValueError(f"oracle kept too few titles for {user}; raise `keep`")
+        recs[row] = ranked[:k]
     per_user = per_user_metrics(recs, split.test_matrix(), items, k, ratio=split.test_ratio_matrix())
     return summarise(per_user, recs, len(items), k), per_user
 

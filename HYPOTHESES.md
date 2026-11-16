@@ -171,6 +171,10 @@ setting is kept as a sensitivity run.
 4. **Exploratory item cold-start test added** (`coldstart` stage): 10% of
    titles are hidden from training entirely, and each model ranks only those
    titles for the viewers who watched them.
+5. **Exploratory ceiling added** (`oracle` stage): the simulator's own ranking,
+   scored on the same split. It shows how much of the reachable Recall@10 each
+   model gets, and, without its favourite-title term, how much of the ceiling
+   the text taste carries. It changes no model and no verdict.
 
 For transparency: this change was made after seeing the 5-vote results, in
 which H2b narrowly failed at p = 2. Both runs are reported, and each verdict

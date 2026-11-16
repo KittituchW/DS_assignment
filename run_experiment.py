@@ -3,6 +3,8 @@
 Stages (default: all five, in order):
     prepare    check inputs, clean catalogue, EDA, item features, simulated viewers
     baselines  popularity (+ type-balanced check), most watched, content kNN (+ text-only and no-text)
+    oracle     the ceiling: rank titles by each viewer's true watch chance in the simulator,
+               with and without its text term (exploratory, no PyTorch)
     train      two tower: H1 ablation (5 seeds at p = 6) and H2 sweep (p = 2 and 12). Needs PyTorch.
     tune       random search on a validation split, then the chosen settings on the test set
                (exploratory, added after the main run). Needs PyTorch.
@@ -51,6 +53,7 @@ from recommender.evaluation import (  # noqa: E402
     content_knn_scorer,
     evaluate,
     evaluate_cold,
+    evaluate_oracle,
     most_watched_scorer,
     popularity_by_type_scorer,
     popularity_scorer,
@@ -59,10 +62,10 @@ from recommender.evaluation import (  # noqa: E402
     validation_split,
 )
 from recommender.features import ItemFeatures, build_item_features  # noqa: E402
-from recommender.simulate import SimConfig, demo_histories, simulate  # noqa: E402
+from recommender.simulate import SimConfig, demo_histories, simulate, simulate_with_oracle  # noqa: E402
 from recommender.tuning import pick_best, sample_configs  # noqa: E402
 
-STAGES = ["prepare", "baselines", "train", "tune", "coldstart", "analyse"]
+STAGES = ["prepare", "baselines", "oracle", "train", "tune", "coldstart", "analyse"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -163,6 +166,24 @@ def stage_baselines(args: argparse.Namespace, paths: Paths) -> None:
             summary, per_user = evaluate(scorer, split, items)
             analysis.save_run(paths.runs, name, p, None, summary, per_user)
             print(f"p={p:g} {name:22s} " + " ".join(f"{k}={v:.3f}" for k, v in summary.items()))
+
+
+def stage_oracle(args: argparse.Namespace, paths: Paths) -> dict:
+    """The ceiling: the simulator's own ranking, scored on the same split as every model."""
+    items, _ = load_items(paths)
+    out = {}
+    for p in args.exponents:
+        events, oracle = simulate_with_oracle(items, SimConfig(users=args.users, pop_exponent=p, seed=args.sim_seed))
+        saved = pd.read_csv(paths.events(p), usecols=["user_id", "item_id"])
+        if not (saved["user_id"].equals(events["user_id"]) and saved["item_id"].equals(events["item_id"])):
+            raise SystemExit(f"re-simulated events at p={p:g} differ from the saved ones; run the prepare stage first")
+        split = load_split(paths, p, items)
+        for part, model in (("full", "oracle"), ("no_text", "oracle_no_text")):
+            summary, per_user = evaluate_oracle(oracle[part], split, items)
+            analysis.save_run(paths.runs, model, p, None, summary, per_user)
+            out[f"{model}_p{p:g}_recall@10"] = round(summary["recall@10"], 4)
+            print(f"p={p:g} {model:15s} recall@10={summary['recall@10']:.4f} hit@10={summary['hit@10']:.3f}")
+    return out
 
 
 def stage_train(args: argparse.Namespace, paths: Paths) -> None:
@@ -302,15 +323,16 @@ def stage_analyse(args: argparse.Namespace, paths: Paths) -> dict:
     search = json.loads(tuning_path.read_text()) if tuning_path.exists() else None
     tuned = analysis.tuned_summary(paths.runs, args.exponents, args.main_exponent, args.seeds, search)
     cold = analysis.cold_start_summary(paths.runs, args.main_exponent, args.seeds)
+    ceiling = analysis.oracle_summary(paths.runs, args.exponents, args.main_exponent, args.seeds)
     (paths.out / "hypothesis_tests.json").write_text(
         json.dumps(
             {"H1": h1, "H2": h2, "exploratory_two_tower_vs_content_knn": comparison, "exploratory_tuned_two_tower": tuned,
-             "exploratory_cold_start": cold, "min_votes": args.min_votes},
+             "exploratory_cold_start": cold, "exploratory_oracle": ceiling, "min_votes": args.min_votes},
             indent=2, default=str,
         ),
         encoding="utf-8",
     )
-    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2, comparison, tuned, cold), encoding="utf-8")
+    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2, comparison, tuned, cold, ceiling), encoding="utf-8")
     analysis.save_figures(h1, h2, paths.out)
 
     items, feats = load_items(paths)
@@ -341,6 +363,7 @@ def main() -> None:
         result = {
             "prepare": stage_prepare,
             "baselines": stage_baselines,
+            "oracle": stage_oracle,
             "train": stage_train,
             "tune": stage_tune,
             "coldstart": stage_coldstart,

@@ -42,3 +42,15 @@ def test_higher_popularity_exponent_concentrates_on_popular_items(raw: pd.DataFr
     low = simulate(items, SimConfig(users=40, pop_exponent=0, seed=1, min_events=3, max_events=10))
     high = simulate(items, SimConfig(users=40, pop_exponent=12, seed=1, min_events=3, max_events=10))
     assert np.mean(pop[high.item_id]) > np.mean(pop[low.item_id])
+
+
+def test_oracle_adds_no_random_draws_and_ranks_by_chance(raw: pd.DataFrame) -> None:
+    from recommender.simulate import simulate_with_oracle
+
+    items = _items(raw)
+    cfg = SimConfig(users=15, pop_exponent=6, seed=3, min_events=3, max_events=10)
+    events, oracle = simulate_with_oracle(items, cfg, keep=20)
+    pd.testing.assert_frame_equal(events, simulate(items, cfg))
+    assert set(oracle) == {"full", "no_text"} and set(oracle["full"]) == set(events.user_id)
+    idx, prob = oracle["full"]["u00000"]
+    assert len(idx) == 20 and np.all(np.diff(prob) <= 0)

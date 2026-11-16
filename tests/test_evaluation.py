@@ -8,6 +8,7 @@ from scipy import sparse
 from recommender.evaluation import (
     cold_start_split,
     evaluate_cold,
+    evaluate_oracle,
     paired_bootstrap,
     per_user_metrics,
     temporal_split,
@@ -137,3 +138,13 @@ def test_evaluate_cold_ranks_only_held_out_titles() -> None:
     assert summary["cold_items"] == 8
     assert summary["viewers"] == int((np.diff(split.test_matrix().indptr) > 0).sum())
     assert len(per_user["recall"]) == summary["viewers"]
+
+
+def test_oracle_skips_titles_already_watched() -> None:
+    items = pd.DataFrame({"is_english": [True] * 10, "type": ["movie"] * 10})
+    rows = [("a", f"i{j}", pd.Timestamp("2024-01-01") + pd.Timedelta(days=j)) for j in (0, 1, 2, 3, 4)]
+    split = temporal_split(pd.DataFrame(rows, columns=["user_id", "item_id", "ts"]), [f"i{j}" for j in range(10)])
+    # Training history is i0, i1, i2; the test set is i3, i4.
+    oracle = {"a": (np.array([0, 3, 1, 9, 4, 8, 7]), np.linspace(1, 0.1, 7))}
+    summary, per_user = evaluate_oracle(oracle, split, items, k=3)
+    assert per_user["recall"][0] == pytest.approx(1.0)  # i3 and i4 both make the top 3 once i0 and i1 are skipped
