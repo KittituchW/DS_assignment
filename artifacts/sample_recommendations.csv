@@ -34,28 +34,28 @@ two_tower,user_A_action,2,Battleship,movie,en,2012,5573,"Action, Adventure, Scie
 two_tower,user_A_action,3,Predators,movie,en,2010,4194,"Action, Science Fiction, Thriller"
 two_tower,user_A_action,4,Maze Runner: The Scorch Trials,movie,en,2015,10474,"Action, Adventure, Science Fiction"
 two_tower,user_A_action,5,Infinite,movie,en,2021,1892,"Action, Adventure, Science Fiction"
-two_tower,user_A_action,6,Captain America: The Winter Soldier,movie,en,2014,18956,"Action, Adventure, Science Fiction"
-two_tower,user_A_action,7,Jurassic World: Fallen Kingdom,movie,en,2018,11937,"Action, Adventure, Science Fiction"
-two_tower,user_A_action,8,The 5th Wave,movie,en,2016,5786,"Action, Adventure, Science Fiction"
-two_tower,user_A_action,9,Prey,movie,en,2022,6882,"Action, Science Fiction, Thriller"
-two_tower,user_A_action,10,Green Lantern,movie,en,2011,7281,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,6,Jurassic World: Fallen Kingdom,movie,en,2018,11937,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,7,Captain America: The Winter Soldier,movie,en,2014,18956,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,8,Prey,movie,en,2022,6882,"Action, Science Fiction, Thriller"
+two_tower,user_A_action,9,Survive,movie,fr,2024,153,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,10,Fantastic Four,movie,en,2015,6039,"Action, Adventure, Science Fiction"
 two_tower,user_B_kdrama,1,Sweet Revenge,tv,ko,2017,36,"Comedy, Drama"
 two_tower,user_B_kdrama,2,King the Land,tv,ko,2023,485,"Comedy, Drama"
 two_tower,user_B_kdrama,3,The Good Bad Mother,tv,ko,2023,149,"Comedy, Drama"
 two_tower,user_B_kdrama,4,Clean with Passion for Now,tv,ko,2018,52,"Comedy, Drama"
-two_tower,user_B_kdrama,5,True Beauty,tv,ko,2020,2284,"Comedy, Drama"
-two_tower,user_B_kdrama,6,Business Proposal,tv,ko,2022,569,"Comedy, Drama"
-two_tower,user_B_kdrama,7,My Sassy Girl,tv,ko,2017,27,"Comedy, Drama"
-two_tower,user_B_kdrama,8,Hospital Playlist,tv,ko,2020,130,"Comedy, Drama"
-two_tower,user_B_kdrama,9,Love Next Door,tv,ko,2024,152,"Comedy, Drama"
-two_tower,user_B_kdrama,10,It's Okay to Not Be Okay,tv,ko,2020,1355,"Comedy, Drama"
+two_tower,user_B_kdrama,5,Business Proposal,tv,ko,2022,569,"Comedy, Drama"
+two_tower,user_B_kdrama,6,True Beauty,tv,ko,2020,2284,"Comedy, Drama"
+two_tower,user_B_kdrama,7,Hospital Playlist,tv,ko,2020,130,"Comedy, Drama"
+two_tower,user_B_kdrama,8,It's Okay to Not Be Okay,tv,ko,2020,1355,"Comedy, Drama"
+two_tower,user_B_kdrama,9,My Sassy Girl,tv,ko,2017,27,"Comedy, Drama"
+two_tower,user_B_kdrama,10,Love Next Door,tv,ko,2024,152,"Comedy, Drama"
 two_tower,user_C_documentary,1,Drain the Oceans,tv,en,2018,15,Documentary
-two_tower,user_C_documentary,2,Eli Roth's History of Horror,tv,en,2018,42,Documentary
-two_tower,user_C_documentary,3,Hamilton's Pharmacopeia,tv,en,2016,12,Documentary
+two_tower,user_C_documentary,2,Hamilton's Pharmacopeia,tv,en,2016,12,Documentary
+two_tower,user_C_documentary,3,Eli Roth's History of Horror,tv,en,2018,42,Documentary
 two_tower,user_C_documentary,4,What on Earth?,tv,en,2015,16,Documentary
 two_tower,user_C_documentary,5,United Shades of America,tv,en,2016,9,Documentary
 two_tower,user_C_documentary,6,Axios,tv,en,2018,9,Documentary
-two_tower,user_C_documentary,7,One Day at Disney,tv,en,2019,9,Documentary
-two_tower,user_C_documentary,8,QT8: The First Eight,movie,en,2019,164,Documentary
-two_tower,user_C_documentary,9,An Inconvenient Sequel: Truth to Power,movie,en,2017,163,Documentary
+two_tower,user_C_documentary,7,HyperNormalisation,movie,en,2016,132,Documentary
+two_tower,user_C_documentary,8,An Inconvenient Sequel: Truth to Power,movie,en,2017,163,Documentary
+two_tower,user_C_documentary,9,QT8: The First Eight,movie,en,2019,164,Documentary
 two_tower,user_C_documentary,10,Explained,tv,en,2018,112,Documentary

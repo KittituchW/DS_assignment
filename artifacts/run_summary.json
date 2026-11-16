@@ -16,7 +16,9 @@
       46
     ],
     "epochs": 10,
-    "sim_seed": 42
+    "sim_seed": 42,
+    "tune_trials": 20,
+    "tune_seed": 0
   },
   "prepare": {
     "input_sha256": {
@@ -216,14 +218,27 @@
     }
   },
   "stage_seconds": {
-    "prepare": 26,
-    "baselines": 9,
-    "analyse": 1,
-    "train": 469
+    "prepare": 27,
+    "baselines": 10,
+    "analyse": 2,
+    "train": 447,
+    "tune": 1144
   },
   "analyse": {
     "H1": "inconclusive",
     "H2a": "supported",
     "H2b": "not supported"
+  },
+  "tune": {
+    "best": {
+      "activation": "relu",
+      "embed_dim": 64,
+      "hidden": 256,
+      "dropout": 0.2,
+      "lr": 0.001,
+      "temperature": 0.07
+    },
+    "best_val_recall@10": 0.03034449439449439,
+    "default_val_recall@10": 0.03034449439449439
   }
 }
