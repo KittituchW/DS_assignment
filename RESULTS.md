@@ -242,7 +242,10 @@ Three hand-seeded viewers. Full lists in `artifacts/sample_recommendations.md`.
    nothing here estimates real viewer lift.
 6. Two tower training is not bit-for-bit repeatable on CPU; gaps under about
    0.1 points of Recall@10 are noise.
-7. The keyword filter is not a maturity system.
+7. The keyword filter is not a maturity system. Content kNN's documentary
+   sample still shows two documentaries about the adult film industry
+   (X-Rated: The Greatest Adult Movies of All Time, After Porn Ends 2).
+   Production needs a real age rating feed.
 
 ## Next steps
 
