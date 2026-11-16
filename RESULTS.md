@@ -14,6 +14,24 @@ All numbers come from simulated viewers. They measure how well a model
 recovers the simulator's rules, not quality for real viewers. Generated tables
 are in `artifacts/results_summary.md`.
 
+## How to read the numbers
+
+Each viewer's latest watches are hidden, and each model gets 10 guesses.
+
+1. **Hit@10:** the share of viewers with at least one correct guess. 12% means
+   12 viewers in 100.
+2. **Recall@10:** the share of hidden watches the 10 guesses found.
+3. **Popularity:** the same top 10 for everyone. No personal taste.
+4. **Content kNN:** finds the titles whose details (genre, language,
+   description) are closest to what the viewer watched. No learning.
+5. **Two tower:** reads the same details, but learns from watch history which
+   details matter to viewers.
+6. **Best possible (oracle):** ranks by each viewer's true taste from the
+   simulator. No model can beat it, so it is the ceiling.
+7. **Cold start:** a title nobody has watched yet.
+
+Full definitions are in the README, section 4.
+
 **Repeat runs.** Simulated events, baselines, the oracle and the EDA are exact
 from run to run. Two tower training is not bit-for-bit repeatable on CPU: the
 same seed and settings can differ by up to about 0.1 points of Recall@10.
