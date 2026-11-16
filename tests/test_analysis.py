@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from recommender.analysis import check_h1, check_h2, save_run
+from recommender.analysis import check_h1, check_h2, compare_two_tower, save_run
 
 N = 400
 RNG = np.random.default_rng(0)
@@ -64,3 +64,14 @@ def test_h2_rules(tmp_path) -> None:
 
     _save(tmp_path, "two_tower", 2, 1, zeros, HELDOUT - 0.2)  # now far below the held-out share
     assert check_h2(tmp_path, [2, 6], 6, [1, 2])["h2b_verdict"] == "not supported"
+
+
+def test_compare_two_tower_reports_each_available_metric(tmp_path) -> None:
+    base = RNG.uniform(0, 0.1, N)
+    for model, recall in (("two_tower", base + 0.01), ("content_knn", base)):
+        per_user = {"recall": recall, "hit": (recall > 0.05).astype(float), "non_en": HELDOUT, "heldout_non_en": HELDOUT}
+        save_run(tmp_path, model, 6, 42 if model == "two_tower" else None, {}, per_user)
+    rows = compare_two_tower(tmp_path, [6], 6, [42])
+    assert rows[0]["recall@10_difference"]["mean"] > 0
+    assert "hit@10_difference" in rows[0]
+    assert "recall_w@10_difference" not in rows[0]  # older runs without watch ratio are skipped, not faked

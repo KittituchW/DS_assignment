@@ -179,6 +179,29 @@ def check_h2(run_dir: Path, exponents: list[float], main_exponent: float, seeds:
     }
 
 
+def compare_two_tower(run_dir: Path, exponents: list[float], main_exponent: float, seeds: list[int], baseline: str = "content_knn") -> list[dict]:
+    """Exploratory, never part of a verdict: two tower minus a baseline, per viewer, at each p.
+
+    Hit@10 and watch-weighted Recall@10 were added after the main run. They are
+    reported next to Recall@10 so the reader can see whether they tell the same story.
+    """
+    rows = []
+    for p in exponents:
+        tt_seeds = seeds if p == main_exponent else seeds[:1]
+        row: dict = {"exponent": p, "baseline": baseline, "two_tower_seeds": tt_seeds}
+        tt_runs = [load_run(run_dir, "two_tower", p, s) for s in tt_seeds]
+        base = load_run(run_dir, baseline, p, None)
+        for metric in ("recall", "hit", "recall_w"):
+            if base is None or metric not in base or any(r is None or metric not in r for r in tt_runs):
+                continue
+            tt = np.mean([r[metric] for r in tt_runs], axis=0)
+            row[f"{metric}@10_two_tower"] = float(np.nanmean(tt))
+            row[f"{metric}@10_{baseline}"] = float(np.nanmean(base[metric]))
+            row[f"{metric}@10_difference"] = _interval(paired_bootstrap(tt - base[metric], BOOTSTRAP_SAMPLES))
+        rows.append(row)
+    return rows
+
+
 # ------------------------------------------------------------------ sample recommendations
 
 
@@ -238,7 +261,7 @@ def _pts(interval: dict | None) -> str:
     return f"{interval['mean'] * 100:+.1f} pts [{interval['ci_low'] * 100:+.1f}, {interval['ci_high'] * 100:+.1f}]"
 
 
-def results_summary(runs: pd.DataFrame, h1: dict, h2: dict) -> str:
+def results_summary(runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dict] | None = None) -> str:
     lines = [
         "# Results summary (generated)",
         "",
@@ -290,6 +313,23 @@ def results_summary(runs: pd.DataFrame, h1: dict, h2: dict) -> str:
             "TV share. Pooled over viewers at the main p.",
             "",
             markdown_table(by_type),
+            "",
+        ]
+    if comparison:
+        table = []
+        for row in comparison:
+            entry = {"p": f"{row['exponent']:g}"}
+            for metric, label in (("recall", "Recall@10"), ("hit", "Hit@10"), ("recall_w", "Watch-weighted Recall@10")):
+                if f"{metric}@10_difference" in row:
+                    entry[label] = _pts(row[f"{metric}@10_difference"])
+            table.append(entry)
+        lines += [
+            f"## Two tower minus {comparison[0]['baseline']} (exploratory)",
+            "",
+            "Paired bootstrap over viewers. Hit@10 and watch-weighted Recall@10 were added after the main run",
+            "and are not part of any decision rule.",
+            "",
+            markdown_table(pd.DataFrame(table)),
             "",
         ]
     return "\n".join(lines)

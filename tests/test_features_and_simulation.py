@@ -33,6 +33,7 @@ def test_simulation_is_deterministic_and_valid(raw: pd.DataFrame) -> None:
     sizes = a.groupby("user_id").size()
     assert sizes.min() >= 3 and sizes.max() <= 10
     assert (a.ts <= pd.Timestamp(cfg.as_of)).all()
+    assert a.watch_ratio.between(0, 1).all()
 
 
 def test_higher_popularity_exponent_concentrates_on_popular_items(raw: pd.DataFrame) -> None:

@@ -188,8 +188,11 @@ def stage_analyse(args: argparse.Namespace, paths: Paths) -> dict:
     runs.to_csv(paths.out / "metrics_all_runs.csv", index=False)
     h1 = analysis.check_h1(paths.runs, args.main_exponent, args.seeds)
     h2 = analysis.check_h2(paths.runs, args.exponents, args.main_exponent, args.seeds)
-    (paths.out / "hypothesis_tests.json").write_text(json.dumps({"H1": h1, "H2": h2}, indent=2), encoding="utf-8")
-    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2), encoding="utf-8")
+    comparison = analysis.compare_two_tower(paths.runs, args.exponents, args.main_exponent, args.seeds)
+    (paths.out / "hypothesis_tests.json").write_text(
+        json.dumps({"H1": h1, "H2": h2, "exploratory_two_tower_vs_content_knn": comparison}, indent=2), encoding="utf-8"
+    )
+    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2, comparison), encoding="utf-8")
     analysis.save_figures(h1, h2, paths.out)
 
     items, feats = load_items(paths)

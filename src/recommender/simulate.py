@@ -14,6 +14,16 @@ Choice model for one viewer:
 
 `pop_exponent` is the bias dial used by H2.
 
+Watch ratio (added after the main run, exploratory only): each event also gets
+the share of the title the viewer watched, drawn as
+
+    watch_ratio ~ Beta(1 + 5 * fit, 2)
+
+where `fit` is the title's rank by watch chance among that viewer's own picks
+(0 = weakest fit, 1 = best fit). A better fit is more likely to be finished.
+It feeds one exploratory metric only. Training never sees it, and it draws
+from its own random stream, so the watch events are identical with or without it.
+
 The text term uses sparse TF-IDF cosine to the anchor title. The model sees a
 different representation (an SVD of a separate TF-IDF), so it cannot read the
 rule straight out of its inputs.
@@ -104,7 +114,8 @@ def simulate(items: pd.DataFrame, cfg: SimConfig = SimConfig()) -> pd.DataFrame:
     tfidf = TfidfVectorizer(max_features=30_000, min_df=2, sublinear_tf=True, stop_words="english").fit_transform(docs)
 
     names = list(PERSONAS)
-    rows: list[tuple[str, str, str, pd.Timestamp]] = []
+    ratio_rng = np.random.default_rng([cfg.seed, 1])  # separate stream: the events do not change
+    rows: list[tuple[str, str, str, pd.Timestamp, float]] = []
     for u in range(cfg.users):
         user = f"u{u:05d}"
         persona_name = names[rng.integers(len(names))]
@@ -130,11 +141,14 @@ def simulate(items: pd.DataFrame, cfg: SimConfig = SimConfig()) -> pd.DataFrame:
 
         n = int(np.clip(rng.lognormal(cfg.lognormal_mean, cfg.lognormal_sigma), cfg.min_events, cfg.max_events))
         n = min(n, int((prob > 0).sum()))
-        for idx in rng.choice(len(items), size=n, replace=False, p=prob):
+        picked = rng.choice(len(items), size=n, replace=False, p=prob)
+        fit = np.argsort(np.argsort(prob[picked], kind="stable"), kind="stable") / max(n - 1, 1)
+        ratios = ratio_rng.beta(1.0 + 5.0 * fit, 2.0)
+        for idx, ratio in zip(picked, ratios):
             start = max(items["date_added"].iloc[idx], as_of - pd.Timedelta(days=730))
             span = max(1, int((as_of - start).total_seconds()))
             ts = start + pd.Timedelta(seconds=int(rng.integers(span)))
-            rows.append((user, items["item_id"].iloc[idx], persona_name, ts))
+            rows.append((user, items["item_id"].iloc[idx], persona_name, ts, round(float(ratio), 4)))
 
-    events = pd.DataFrame(rows, columns=["user_id", "item_id", "persona", "ts"])
+    events = pd.DataFrame(rows, columns=["user_id", "item_id", "persona", "ts", "watch_ratio"])
     return events.sort_values(["user_id", "ts"], kind="stable").reset_index(drop=True)

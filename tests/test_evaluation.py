@@ -46,6 +46,37 @@ def test_metrics_on_a_known_example() -> None:
     assert (m["heldout_movie"][0], m["heldout_tv"][0], m["heldout_tv_non_en"][0]) == (0, 2, 1)
 
 
+def test_hit_and_watch_weighted_recall() -> None:
+    items = pd.DataFrame({"is_english": [True] * 6, "type": ["movie"] * 6})
+    recs = np.array([[0, 1, 2], [0, 1, 2]])
+    # Viewer 0 held out items 1 and 5 and finished item 1; viewer 1 held out items 4 and 5.
+    test = sparse.csr_matrix(np.array([[0, 1, 0, 0, 0, 1], [0, 0, 0, 0, 1, 1]], dtype=np.float32))
+    ratio = sparse.csr_matrix(np.array([[0, 0.9, 0, 0, 0, 0.3], [0, 0, 0, 0, 0.5, 0.5]], dtype=np.float32))
+    m = per_user_metrics(recs, test, items, k=3, ratio=ratio)
+    assert m["hit"].tolist() == [1.0, 0.0]
+    assert m["recall"][0] == pytest.approx(0.5)
+    assert m["recall_w"][0] == pytest.approx(0.9 / 1.2)  # the finished title counts more
+    assert m["recall_w"][1] == pytest.approx(0.0)
+
+
+def test_ratio_matrix_must_match_the_held_out_items() -> None:
+    items = pd.DataFrame({"is_english": [True] * 3, "type": ["movie"] * 3})
+    test = sparse.csr_matrix(np.array([[1, 1, 0]], dtype=np.float32))
+    ratio = sparse.csr_matrix(np.array([[0.5, 0, 0.5]], dtype=np.float32))
+    with pytest.raises(ValueError):
+        per_user_metrics(np.array([[0, 1]]), test, items, k=2, ratio=ratio)
+
+
+def test_split_carries_watch_ratio_only_when_present() -> None:
+    events = _events()
+    assert temporal_split(events, [f"i{j}" for j in range(10)]).test_ratio_matrix() is None
+    events["watch_ratio"] = np.linspace(0.1, 0.9, len(events))
+    split = temporal_split(events, [f"i{j}" for j in range(10)])
+    ratio, test = split.test_ratio_matrix(), split.test_matrix()
+    assert np.array_equal(ratio.indices, test.indices) and np.array_equal(ratio.indptr, test.indptr)
+    assert sorted(ratio.data.round(4).tolist()) == sorted(split.test["watch_ratio"].astype("float32").round(4).tolist())
+
+
 def test_bootstrap_of_a_constant_is_that_constant() -> None:
     mean, lo, hi = paired_bootstrap(np.full(50, 0.1))
     assert mean == pytest.approx(0.1) and lo == pytest.approx(0.1) and hi == pytest.approx(0.1)

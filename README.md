@@ -124,6 +124,11 @@ test set. Metrics at 10: Recall, NDCG, catalogue coverage, non-English share
 and TV share. Every metric is kept per viewer, so comparisons use a paired
 bootstrap (2,000 resamples) instead of a single number.
 
+Two exploratory metrics sit next to these and never enter a decision rule:
+Hit@10 (at least one held-out title in the top 10) and watch-weighted Recall@10
+(each held-out title counts by its simulated watch ratio, so a finished title
+counts more). See the 2026-11-16 entry in HYPOTHESES.md.
+
 ## 5. How to run
 
 Python 3.10 or newer, CPU only.

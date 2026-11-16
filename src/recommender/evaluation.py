@@ -6,6 +6,9 @@ out. Training never sees a viewer's future.
 Metrics at k, computed per viewer so they can be bootstrapped:
     recall@k        share of the viewer's held-out items found in the top k
     ndcg@k          rank-weighted recall
+    hit@k           1 if at least one held-out item is in the top k (exploratory)
+    recall_w@k      recall where each held-out item counts by its watch ratio, so a
+                    title the viewer finished counts more than one they quit (exploratory)
     non_en@k        share of the top k that is non-English
     tv@k            share of the top k that is TV
     heldout_non_en  share of the viewer's held-out items that is non-English (H2 reference)
@@ -37,15 +40,17 @@ class Split:
     user_ids: list[str]
     item_index: dict[str, int]
 
-    def _matrix(self, frame: pd.DataFrame) -> sparse.csr_matrix:
+    def _matrix(self, frame: pd.DataFrame, values: np.ndarray | None = None) -> sparse.csr_matrix:
         user_index = {u: i for i, u in enumerate(self.user_ids)}
         rows = frame["user_id"].map(user_index).to_numpy()
         cols = frame["item_id"].map(self.item_index).to_numpy()
         m = sparse.csr_matrix(
-            (np.ones(len(rows), dtype=np.float32), (rows, cols)),
+            (np.ones(len(rows), dtype=np.float32) if values is None else values.astype(np.float32), (rows, cols)),
             shape=(len(self.user_ids), len(self.item_index)),
         )
-        m.data[:] = 1.0
+        if values is None:
+            m.data[:] = 1.0
+        m.sort_indices()
         return m
 
     def history_matrix(self) -> sparse.csr_matrix:
@@ -53,6 +58,12 @@ class Split:
 
     def test_matrix(self) -> sparse.csr_matrix:
         return self._matrix(self.test)
+
+    def test_ratio_matrix(self) -> sparse.csr_matrix | None:
+        """Held-out items weighted by watch ratio, or None when the events carry no ratio."""
+        if "watch_ratio" not in self.test.columns:
+            return None
+        return self._matrix(self.test, self.test["watch_ratio"].to_numpy())
 
 
 def temporal_split(events: pd.DataFrame, item_ids: list[str], test_frac: float = 0.2) -> Split:
@@ -83,11 +94,20 @@ def recommend(scorer: Scorer, history: sparse.csr_matrix, k: int = 10, block: in
     return np.vstack(out)
 
 
-def per_user_metrics(recs: np.ndarray, test: sparse.csr_matrix, items: pd.DataFrame, k: int = 10) -> dict[str, np.ndarray]:
+def per_user_metrics(
+    recs: np.ndarray, test: sparse.csr_matrix, items: pd.DataFrame, k: int = 10, ratio: sparse.csr_matrix | None = None
+) -> dict[str, np.ndarray]:
     non_en_item = (~items["is_english"].to_numpy()).astype(bool)
     tv_item = items["type"].eq("tv").to_numpy()
     discounts = 1.0 / np.log2(np.arange(2, k + 2))
-    recall, ndcg, heldout = [], [], []
+    test = test.tocsr()
+    test.sort_indices()
+    if ratio is not None:
+        ratio = ratio.tocsr()
+        ratio.sort_indices()
+        if not (np.array_equal(ratio.indptr, test.indptr) and np.array_equal(ratio.indices, test.indices)):
+            raise ValueError("ratio matrix must hold the same held-out items as the test matrix")
+    recall, ndcg, heldout, hit, recall_w = [], [], [], [], []
     held_counts = np.zeros((recs.shape[0], 4), dtype=np.int32)  # movie, movie non-EN, tv, tv non-EN
     for u in range(recs.shape[0]):
         relevant = test.indices[test.indptr[u] : test.indptr[u + 1]]
@@ -95,13 +115,19 @@ def per_user_metrics(recs: np.ndarray, test: sparse.csr_matrix, items: pd.DataFr
         n_rel = max(len(relevant), 1)
         recall.append(hits.sum() / n_rel)
         ndcg.append((hits * discounts).sum() / discounts[: min(n_rel, k)].sum())
+        hit.append(float(hits.sum() > 0))
+        if ratio is not None:
+            w = ratio.data[ratio.indptr[u] : ratio.indptr[u + 1]]
+            found = np.isin(relevant, recs[u, :k])
+            recall_w.append((w * found).sum() / w.sum() if w.sum() > 0 else np.nan)
         heldout.append(non_en_item[relevant].mean() if len(relevant) else np.nan)
         is_tv, is_non_en = tv_item[relevant], non_en_item[relevant]
         held_counts[u] = [(~is_tv).sum(), (~is_tv & is_non_en).sum(), is_tv.sum(), (is_tv & is_non_en).sum()]
     top_tv, top_non_en = tv_item[recs[:, :k]], non_en_item[recs[:, :k]]
-    return {
+    out = {
         "recall": np.asarray(recall),
         "ndcg": np.asarray(ndcg),
+        "hit": np.asarray(hit),
         "non_en": top_non_en.mean(axis=1),
         "tv": top_tv.mean(axis=1),
         "heldout_non_en": np.asarray(heldout),
@@ -114,23 +140,30 @@ def per_user_metrics(recs: np.ndarray, test: sparse.csr_matrix, items: pd.DataFr
         "heldout_tv": held_counts[:, 2],
         "heldout_tv_non_en": held_counts[:, 3],
     }
+    if ratio is not None:
+        out["recall_w"] = np.asarray(recall_w)
+    return out
 
 
 def summarise(per_user: dict[str, np.ndarray], recs: np.ndarray, n_items: int, k: int = 10) -> dict[str, float]:
-    return {
+    out = {
         f"recall@{k}": float(np.nanmean(per_user["recall"])),
         f"ndcg@{k}": float(np.nanmean(per_user["ndcg"])),
+        f"hit@{k}": float(np.nanmean(per_user["hit"])),
         f"coverage@{k}": float(len(np.unique(recs[:, :k])) / n_items),
         f"non_en@{k}": float(np.nanmean(per_user["non_en"])),
         f"tv@{k}": float(np.nanmean(per_user["tv"])),
         "heldout_non_en": float(np.nanmean(per_user["heldout_non_en"])),
     }
+    if "recall_w" in per_user:
+        out[f"recall_w@{k}"] = float(np.nanmean(per_user["recall_w"]))
+    return out
 
 
 def evaluate(scorer: Scorer, split: Split, items: pd.DataFrame, k: int = 10) -> tuple[dict[str, float], dict[str, np.ndarray]]:
     history = split.history_matrix()
     recs = recommend(scorer, history, k)
-    per_user = per_user_metrics(recs, split.test_matrix(), items, k)
+    per_user = per_user_metrics(recs, split.test_matrix(), items, k, ratio=split.test_ratio_matrix())
     return summarise(per_user, recs, len(items), k), per_user
 
 

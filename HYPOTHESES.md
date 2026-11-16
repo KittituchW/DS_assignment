@@ -114,3 +114,22 @@ changes a decision rule.
 For transparency: the baseline results behind H2a were computed during
 development, both before and after this change. The two tower model had not
 been trained when this entry was written.
+
+**2026-11-16, after the main run.** Two exploratory metrics added. Neither
+enters a decision rule, and the H1 and H2 verdicts stand as reported.
+
+1. **Hit@10.** 1 if at least one held-out title is in the viewer's top 10. It
+   is easier to explain than Recall@10, but coarser: finding one held-out title
+   or five counts the same.
+2. **Watch-weighted Recall@10.** The simulator now also gives each event a
+   watch ratio, the share of the title the viewer watched. It is drawn from
+   Beta(1 + 5 × fit, 2), where fit is the title's rank by watch chance among
+   that viewer's own picks, so a better fit is more likely to be finished.
+   Recall then counts each held-out title by its watch ratio. The ratio comes
+   from its own random stream, so the watch events, the split and every
+   existing number are unchanged (checked against the previous simulator at
+   p = 2, 6 and 12). Training never sees the ratio.
+
+The watch ratio is a rule we wrote, like the rest of the simulator. It shows
+whether the ranking also favours titles a viewer would finish under that rule,
+not whether real viewers would finish them.
