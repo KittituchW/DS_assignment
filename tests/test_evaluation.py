@@ -5,7 +5,15 @@ import pandas as pd
 import pytest
 from scipy import sparse
 
-from recommender.evaluation import paired_bootstrap, per_user_metrics, temporal_split, top_k, validation_split
+from recommender.evaluation import (
+    cold_start_split,
+    evaluate_cold,
+    paired_bootstrap,
+    per_user_metrics,
+    temporal_split,
+    top_k,
+    validation_split,
+)
 
 
 def _events() -> pd.DataFrame:
@@ -96,3 +104,36 @@ def test_validation_split_never_touches_the_test_set() -> None:
     assert not test_pairs & set(zip(val.test.user_id, val.test.item_id))
     a_val = val.test[val.test.user_id == "a"]
     assert set(a_val.item_id) == {"i6", "i7"}  # the latest training events, before the test events i8 and i9
+
+
+def _cold_world():
+    items = pd.DataFrame({
+        "item_id": [f"i{j}" for j in range(40)],
+        "type": ["movie"] * 30 + ["tv"] * 10,
+        "is_english": [True] * 40,
+    })
+    rng = np.random.default_rng(0)
+    rows = [(f"u{u}", f"i{j}", pd.Timestamp("2024-01-01") + pd.Timedelta(days=int(d)))
+            for u in range(12) for d, j in enumerate(rng.choice(40, size=10, replace=False))]
+    return items, pd.DataFrame(rows, columns=["user_id", "item_id", "ts"])
+
+
+def test_cold_start_split_hides_titles_from_training() -> None:
+    items, events = _cold_world()
+    split, cold = cold_start_split(events, items, frac=0.2, seed=1)
+    cold_ids = set(items.item_id[cold])
+    assert cold.sum() == 6 + 2  # 20% of 30 movies and 20% of 10 TV titles
+    assert not cold_ids & set(split.train.item_id)
+    assert set(split.test.item_id) <= cold_ids
+    assert len(split.train) + len(split.test) == len(events)
+
+
+def test_evaluate_cold_ranks_only_held_out_titles() -> None:
+    items, events = _cold_world()
+    split, cold = cold_start_split(events, items, frac=0.2, seed=1)
+    # A scorer that prefers warm titles: the cold-only ranking must ignore them.
+    prefer_warm = lambda history: np.tile(np.where(cold, 0.0, 1.0), (history.shape[0], 1))
+    summary, per_user = evaluate_cold(prefer_warm, split, items, cold, k=3)
+    assert summary["cold_items"] == 8
+    assert summary["viewers"] == int((np.diff(split.test_matrix().indptr) > 0).sum())
+    assert len(per_user["recall"]) == summary["viewers"]

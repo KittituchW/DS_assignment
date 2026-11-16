@@ -34,12 +34,17 @@ def _fake_two_tower() -> types.ModuleType:
         activation: str = "relu"
 
     def train_two_tower(item_features, history, cfg, feature_mask=None, log=True):
+        assert history.shape[1] == item_features.shape[0]
         rng = np.random.default_rng([cfg.seed, cfg.embed_dim, cfg.hidden])
         table = rng.normal(size=(item_features.shape[0], 8)).astype(np.float32)
-        return None, table, [1.0]
+        return cfg.seed, table, [1.0]
+
+    def embed_items(tower, item_features, feature_mask=None):
+        return np.random.default_rng(tower).normal(size=(item_features.shape[0], 8)).astype(np.float32)
 
     module.TrainConfig = TrainConfig
     module.train_two_tower = train_two_tower
+    module.embed_items = embed_items
     return module
 
 
@@ -83,3 +88,6 @@ def test_all_stages_run_and_write_their_outputs(tmp_path, monkeypatch) -> None:
     assert "two_tower_tuned_no_text" in runs
     assert "hit@10" in runs and "recall_w@10" in runs
     assert "Tuned two tower" in (out / "results_summary.md").read_text()
+    cold = tests["exploratory_cold_start"]
+    assert cold["cold_items"] > 0 and set(cold["models"]) == {"two_tower", "content_knn", "popularity"}
+    assert "Item cold start" in (out / "results_summary.md").read_text()

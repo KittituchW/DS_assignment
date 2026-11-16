@@ -6,11 +6,14 @@ Stages (default: all five, in order):
     train      two tower: H1 ablation (5 seeds at p = 6) and H2 sweep (p = 2 and 12). Needs PyTorch.
     tune       random search on a validation split, then the chosen settings on the test set
                (exploratory, added after the main run). Needs PyTorch.
+    coldstart  hold 10% of titles out of training entirely, then rank only those titles
+               (exploratory item cold start). Needs PyTorch.
     analyse    H1 and H2 decision rules, result tables, figures, sample recommendations
 
 Examples:
     python run_experiment.py --download                 # everything, about 30 minutes on a laptop CPU
     python run_experiment.py --stages tune analyse      # only the search, after prepare and train
+    python run_experiment.py --min-votes 5 --output artifacts/sensitivity_min5 --stages prepare baselines train analyse
     python run_experiment.py --stages prepare baselines analyse   # no PyTorch needed
     python run_experiment.py --stages analyse           # re-run the analysis from saved runs
 """
@@ -33,6 +36,7 @@ import pandas as pd  # noqa: E402
 
 from recommender import analysis  # noqa: E402
 from recommender.data import (  # noqa: E402
+    MIN_VOTES,
     build_catalogue,
     check_inputs,
     download_raw,
@@ -43,8 +47,10 @@ from recommender.data import (  # noqa: E402
 )
 from recommender.eda import save_eda  # noqa: E402
 from recommender.evaluation import (  # noqa: E402
+    cold_start_split,
     content_knn_scorer,
     evaluate,
+    evaluate_cold,
     most_watched_scorer,
     popularity_by_type_scorer,
     popularity_scorer,
@@ -56,7 +62,7 @@ from recommender.features import ItemFeatures, build_item_features  # noqa: E402
 from recommender.simulate import SimConfig, demo_histories, simulate  # noqa: E402
 from recommender.tuning import pick_best, sample_configs  # noqa: E402
 
-STAGES = ["prepare", "baselines", "train", "tune", "analyse"]
+STAGES = ["prepare", "baselines", "train", "tune", "coldstart", "analyse"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -71,8 +77,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--sim-seed", type=int, default=42)
+    parser.add_argument("--min-votes", type=int, default=MIN_VOTES, help="vote floor for recommendable titles (5 = sensitivity run)")
     parser.add_argument("--tune-trials", type=int, default=20, help="settings tried in the random search, default first")
     parser.add_argument("--tune-seed", type=int, default=0)
+    parser.add_argument("--cold-frac", type=float, default=0.1, help="share of titles hidden from training in the cold-start test")
+    parser.add_argument("--cold-seed", type=int, default=0)
     return parser.parse_args()
 
 
@@ -114,10 +123,10 @@ def stage_prepare(args: argparse.Namespace, paths: Paths) -> dict:
         download_raw(data_dir)
     hashes = check_inputs(data_dir)
     raw = load_raw(data_dir)
-    catalogue = build_catalogue(raw)
+    catalogue = build_catalogue(raw, args.min_votes)
     save_catalogue(catalogue, paths.cache / "catalogue.csv")
     catalogue = load_catalogue(paths.cache / "catalogue.csv")
-    summary = save_eda(raw, catalogue, paths.out)
+    summary = save_eda(raw, catalogue, paths.out, args.min_votes)
     items = recommendable_items(catalogue)
     print(f"catalogue: {len(catalogue):,} items, {len(items):,} recommendable")
 
@@ -249,6 +258,40 @@ def stage_tune(args: argparse.Namespace, paths: Paths) -> dict:
     return {"best": best, "best_val_recall@10": search["best_val_recall@10"], "default_val_recall@10": search["default_val_recall@10"]}
 
 
+def stage_coldstart(args: argparse.Namespace, paths: Paths) -> dict:
+    """Item cold start (exploratory): titles hidden from training, then ranked from their metadata alone."""
+    try:
+        from recommender.two_tower import TrainConfig, embed_items, train_two_tower
+    except ImportError as exc:
+        raise SystemExit(f"PyTorch is needed for the coldstart stage ({exc}). Install requirements.txt or skip this stage.")
+
+    items, feats = load_items(paths)
+    p = args.main_exponent
+    events = pd.read_csv(paths.events(p), parse_dates=["ts"])
+    split, cold = cold_start_split(events, items, args.cold_frac, args.cold_seed)
+    warm = np.flatnonzero(~cold)
+    history = split.history_matrix()
+    print(f"  {int(cold.sum()):,} titles held out of training, {len(split.test):,} of their watches held out")
+    for name, scorer in (("cold_content_knn", content_knn_scorer(feats.matrix)), ("cold_popularity", popularity_scorer(items))):
+        summary, per_user = evaluate_cold(scorer, split, items, cold)
+        analysis.save_run(paths.runs, name, p, None, summary, per_user)
+        print(f"  {name:18s} recall@10={summary['recall@10']:.4f} hit@10={summary['hit@10']:.4f}")
+    for seed in args.seeds:
+        t0 = time.time()
+        # Train on the other titles only: held-out titles are not even negatives in the softmax.
+        tower, _, losses = train_two_tower(
+            feats.matrix[warm], history[:, warm], TrainConfig(epochs=args.epochs, seed=seed), log=False
+        )
+        table = embed_items(tower, feats.matrix)
+        summary, per_user = evaluate_cold(two_tower_scorer(table), split, items, cold)
+        analysis.save_run(
+            paths.runs, "cold_two_tower", p, seed, summary, per_user,
+            train_seconds=round(time.time() - t0), loss_history=[round(x, 4) for x in losses],
+        )
+        print(f"  cold_two_tower seed={seed} recall@10={summary['recall@10']:.4f} hit@10={summary['hit@10']:.4f}")
+    return {"cold_items": int(cold.sum()), "viewers_with_held_out_watches": summary["viewers"]}
+
+
 def stage_analyse(args: argparse.Namespace, paths: Paths) -> dict:
     runs = analysis.all_runs_table(paths.runs)
     runs.to_csv(paths.out / "metrics_all_runs.csv", index=False)
@@ -258,14 +301,16 @@ def stage_analyse(args: argparse.Namespace, paths: Paths) -> dict:
     tuning_path = paths.out / "tuning.json"
     search = json.loads(tuning_path.read_text()) if tuning_path.exists() else None
     tuned = analysis.tuned_summary(paths.runs, args.exponents, args.main_exponent, args.seeds, search)
+    cold = analysis.cold_start_summary(paths.runs, args.main_exponent, args.seeds)
     (paths.out / "hypothesis_tests.json").write_text(
         json.dumps(
-            {"H1": h1, "H2": h2, "exploratory_two_tower_vs_content_knn": comparison, "exploratory_tuned_two_tower": tuned},
+            {"H1": h1, "H2": h2, "exploratory_two_tower_vs_content_knn": comparison, "exploratory_tuned_two_tower": tuned,
+             "exploratory_cold_start": cold, "min_votes": args.min_votes},
             indent=2, default=str,
         ),
         encoding="utf-8",
     )
-    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2, comparison, tuned), encoding="utf-8")
+    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2, comparison, tuned, cold), encoding="utf-8")
     analysis.save_figures(h1, h2, paths.out)
 
     items, feats = load_items(paths)
@@ -298,6 +343,7 @@ def main() -> None:
             "baselines": stage_baselines,
             "train": stage_train,
             "tune": stage_tune,
+            "coldstart": stage_coldstart,
             "analyse": stage_analyse,
         }[stage](args, paths)
         if result:

@@ -119,3 +119,13 @@ def train_two_tower(
     with torch.no_grad():
         table = tower(x_items).numpy().astype(np.float32)
     return tower, table, losses
+
+
+def embed_items(tower: ItemTower, item_features: np.ndarray, feature_mask: np.ndarray | None = None) -> np.ndarray:
+    """Item vectors for any feature rows, including titles the tower never trained on (cold start)."""
+    feats = item_features.astype(np.float32)
+    if feature_mask is not None:
+        feats = feats * feature_mask[None, :].astype(np.float32)
+    tower.eval()
+    with torch.no_grad():
+        return tower(torch.tensor(feats)).numpy().astype(np.float32)

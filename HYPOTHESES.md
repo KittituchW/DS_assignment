@@ -149,3 +149,29 @@ learning rate and temperature, with the pre-registered settings as trial 0.
 3. **The verdicts above are not changed.** They come from the pre-registered
    settings. The tuned model, and the H1 rule applied to it, are reported next
    to them as exploratory results.
+
+**2026-11-17, after the main run.** The catalogue rules changed, and the old
+setting is kept as a sensitivity run.
+
+1. **Vote floor lowered from 5 to 1.** Further EDA showed that the 5-vote
+   floor removed half of the TV titles (4,833 with full metadata), 80% of them
+   non-English, and 58% of the 2025 releases that have at least one vote. That
+   biases the H2 test, which is about non-English exposure, and it removes the
+   new titles that cold start is about. The floor's other purpose, noisy
+   ratings, is already handled by the Bayesian rating: 97 of the top 100
+   titles by raw average had fewer than 5 votes, and none do after shrinkage.
+   A title with no votes at all is still excluded, because nothing shows it
+   was ever watched.
+2. **A title now needs a genre and a description** (before: either one), so
+   every title has real text for H1. Recommendable titles: 25,280 (41.5% TV,
+   49.3% non-English), against 22,059 (35% TV, 45% non-English) before.
+3. **The full experiment re-runs on the new catalogue** with the same decision
+   rules. The same run with a 5-vote floor and the new metadata rule is
+   reported next to it as a sensitivity check (`artifacts/sensitivity_min5/`).
+4. **Exploratory item cold-start test added** (`coldstart` stage): 10% of
+   titles are hidden from training entirely, and each model ranks only those
+   titles for the viewers who watched them.
+
+For transparency: this change was made after seeing the 5-vote results, in
+which H2b narrowly failed at p = 2. Both runs are reported, and each verdict
+is read from the rules exactly as written above.

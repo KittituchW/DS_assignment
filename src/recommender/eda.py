@@ -14,6 +14,11 @@ import pandas as pd
 
 from recommender import plotting
 from recommender.data import CORE_METADATA, MIN_VOTES
+
+# Rating statistics use titles with at least this many votes, whatever the
+# recommendable floor is, because averages from fewer votes are mostly noise.
+RELIABLE_VOTES = 5
+FLOORS_COMPARED = (0, 1, 5)
 from recommender.simulate import PERSONAS
 
 DESCRIPTIONS = {
@@ -60,14 +65,14 @@ def schema_table(raw: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def funnel(raw: pd.DataFrame, catalogue: pd.DataFrame) -> pd.DataFrame:
+def funnel(raw: pd.DataFrame, catalogue: pd.DataFrame, min_votes: int = MIN_VOTES) -> pd.DataFrame:
     """Rows per type after each cleaning step, applied in order."""
     raw_type = raw["type"].map({"Movie": "movie", "TV Show": "tv"})
     keep = pd.Series(True, index=catalogue.index)
     stages = {"raw rows": raw_type.value_counts(), "after de-duplication": catalogue["type"].value_counts()}
     for label, col in (
-        ("has genre or description", "excluded_no_content"),
-        (f"at least {MIN_VOTES} votes", "excluded_low_votes"),
+        ("has genre and description", "excluded_missing_metadata"),
+        (f"at least {min_votes} vote{'s' if min_votes != 1 else ''}", "excluded_low_votes"),
         ("adult keyword filter", "excluded_adult_keyword"),
     ):
         keep &= ~catalogue[col]
@@ -112,11 +117,46 @@ def cast_link_share(items: pd.DataFrame, top: int = 5) -> float:
     return len(linked) / max(len(items), 1)
 
 
-def eda_summary(raw: pd.DataFrame, catalogue: pd.DataFrame) -> dict:
+def rating_noise(catalogue: pd.DataFrame, top: int = 100) -> dict:
+    """Why a Bayesian rating: the top titles by raw average are mostly one-vote 10s."""
+    voted = catalogue[catalogue["vote_count"] > 0]
+    by_raw = voted.sort_values(["vote_average", "vote_count"], ascending=[False, False]).head(top)
+    by_bayes = catalogue.sort_values("weighted_rating", ascending=False).head(top)
+    return {
+        "top": top,
+        "raw_top_share_under_5_votes": round(float(by_raw["vote_count"].lt(5).mean()), 3),
+        "raw_top_share_at_10": round(float(by_raw["vote_average"].eq(10).mean()), 3),
+        "raw_top_median_votes": float(by_raw["vote_count"].median()),
+        "bayes_top_share_under_5_votes": round(float(by_bayes["vote_count"].lt(5).mean()), 3),
+        "bayes_top_median_votes": float(by_bayes["vote_count"].median()),
+    }
+
+
+def vote_floor_comparison(catalogue: pd.DataFrame) -> list[dict]:
+    """What each vote floor keeps, with the metadata and adult rules applied. Independent of the floor in use."""
+    base = catalogue[~catalogue["excluded_missing_metadata"] & ~catalogue["excluded_adult_keyword"]]
+    rows = []
+    for floor in FLOORS_COMPARED:
+        kept = base[base["vote_count"] >= floor]
+        rows.append({
+            "min_votes": floor,
+            "titles": int(len(kept)),
+            "tv_share": round(float(kept["type"].eq("tv").mean()), 3),
+            "non_english_share": round(float(1 - kept["is_english"].mean()), 3),
+            "titles_2025": int(kept["release_year"].eq(2025).sum()),
+        })
+    return rows
+
+
+def eda_summary(raw: pd.DataFrame, catalogue: pd.DataFrame, min_votes: int = MIN_VOTES) -> dict:
     movies = raw[raw["type"].eq("Movie")]
     tv = raw[raw["type"].eq("TV Show")]
     items = catalogue[catalogue["recommendable"]]
-    voted = catalogue[catalogue["vote_count"] >= MIN_VOTES]
+    voted = catalogue[catalogue["vote_count"] >= RELIABLE_VOTES]
+    ok = ~catalogue["excluded_missing_metadata"] & ~catalogue["excluded_adult_keyword"]
+    tv_cut_by_5 = catalogue[ok & catalogue["type"].eq("tv") & catalogue["vote_count"].between(0, RELIABLE_VOTES - 1)]
+    name = catalogue["title"].str.lower().str.strip()
+    same_name = catalogue[pd.DataFrame({"t": catalogue["type"], "k": name}).duplicated(keep=False)]
     share = english_share_by_popularity(items)
     non_latin = items["description"].map(lambda s: sum(ch > "\u007f" for ch in s) / max(len(s), 1) > 0.3)
     return {
@@ -126,7 +166,15 @@ def eda_summary(raw: pd.DataFrame, catalogue: pd.DataFrame) -> dict:
         "tv_show_id_repeats": int(tv["show_id"].duplicated().sum()),
         "catalogue_items": int(len(catalogue)),
         "recommendable_items": int(len(items)),
-        "funnel": funnel(raw, catalogue).to_dict(orient="index"),
+        "min_votes": min_votes,
+        "funnel": funnel(raw, catalogue, min_votes).to_dict(orient="index"),
+        "same_name_titles": {
+            "rows": int(len(same_name)),
+            "names": int(same_name.groupby(["type", name[same_name.index]]).ngroups),
+            "names_with_a_repeated_year": int(
+                same_name.groupby(["type", name[same_name.index]])["release_year"].apply(lambda y: y.duplicated().any()).sum()
+            ),
+        },
         "recommendable_movie_share": round(float(items["type"].eq("movie").mean()), 3),
         "rating_equals_vote_average": bool(np.allclose(raw["rating"].fillna(-1), raw["vote_average"].fillna(-1))),
         "movie_duration_missing_pct": round(float(movies["duration"].isna().mean() * 100), 1),
@@ -134,13 +182,23 @@ def eda_summary(raw: pd.DataFrame, catalogue: pd.DataFrame) -> dict:
         "votes_by_type": {
             t: {
                 "zero_share": round(float(g["vote_count"].eq(0).mean()), 3),
-                "below_min_votes_share": round(float(g["vote_count"].lt(MIN_VOTES).mean()), 3),
+                "below_5_share": round(float(g["vote_count"].lt(RELIABLE_VOTES).mean()), 3),
+                "below_floor_share": round(float(g["vote_count"].lt(min_votes).mean()), 3),
                 "median": float(g["vote_count"].median()),
             }
             for t, g in catalogue.groupby("type")
         },
-        "mean_vote_average_by_type_min_votes": {
+        "mean_vote_average_by_type_5_votes": {
             t: round(float(g["vote_average"].mean()), 2) for t, g in voted.groupby("type")
+        },
+        "median_raw_popularity_by_type": {
+            t: round(float(g["popularity"].median()), 1) for t, g in catalogue.groupby("type")
+        },
+        "rating_noise": rating_noise(catalogue),
+        "vote_floor_comparison": vote_floor_comparison(catalogue),
+        "tv_under_5_votes_with_metadata": {
+            "titles": int(len(tv_cut_by_5)),
+            "non_english_share": round(float(1 - tv_cut_by_5["is_english"].mean()), 3),
         },
         "median_genres_per_title": float(catalogue["genres"].map(len).median()),
         "non_english_share_catalogue": round(float(1 - catalogue["is_english"].mean()), 3),
@@ -177,7 +235,7 @@ def _grouped_bars(ax, frame: pd.DataFrame, fmt: str = "{:.0f}") -> None:
     ax.legend()
 
 
-def save_eda(raw: pd.DataFrame, catalogue: pd.DataFrame, output: Path) -> dict:
+def save_eda(raw: pd.DataFrame, catalogue: pd.DataFrame, output: Path, min_votes: int = MIN_VOTES) -> dict:
     """Write the schema table, summary JSON and the EDA figures. Returns the summary."""
     import matplotlib.pyplot as plt
 
@@ -185,7 +243,7 @@ def save_eda(raw: pd.DataFrame, catalogue: pd.DataFrame, output: Path) -> dict:
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     schema_table(raw).to_csv(output / "eda_schema.csv", index=False)
-    summary = eda_summary(raw, catalogue)
+    summary = eda_summary(raw, catalogue, min_votes)
     (output / "eda_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     items = catalogue[catalogue["recommendable"]]
 
@@ -197,10 +255,10 @@ def save_eda(raw: pd.DataFrame, catalogue: pd.DataFrame, output: Path) -> dict:
     plotting.save(fig, output / "eda_missingness.png")
 
     # 2. Cleaning funnel
-    steps = funnel(raw, catalogue)
+    steps = funnel(raw, catalogue, min_votes)
     fig, ax = plt.subplots(figsize=(9, 4.5))
     _grouped_bars(ax, steps)
-    ax.set(title="The vote filter removes half of TV; recommendable titles are mostly movies", ylabel="Titles")
+    ax.set(title=f"Titles left after each cleaning step (vote floor {min_votes})", ylabel="Titles")
     ax.tick_params(axis="x", labelsize=8)
     plotting.save(fig, output / "eda_cleaning_funnel.png")
 
@@ -210,22 +268,22 @@ def save_eda(raw: pd.DataFrame, catalogue: pd.DataFrame, output: Path) -> dict:
     for t in TYPES:
         votes = catalogue.loc[catalogue["type"].eq(t), "vote_count"] + 1
         ax.hist(votes, bins=bins, histtype="step", linewidth=2, color=plotting.TYPE_COLOURS[t], label="TV" if t == "tv" else "Movie")
-    ax.axvline(MIN_VOTES + 1, color=plotting.INK_SECONDARY, linewidth=1)
-    ax.annotate(f"minimum {MIN_VOTES} votes", (MIN_VOTES + 1, ax.get_ylim()[1] * 0.92), xytext=(5, 0), textcoords="offset points", fontsize=8, color=plotting.INK_SECONDARY)
+    ax.axvline(RELIABLE_VOTES + 1, color=plotting.INK_SECONDARY, linewidth=1)
+    ax.annotate(f"{RELIABLE_VOTES} votes", (RELIABLE_VOTES + 1, ax.get_ylim()[1] * 0.92), xytext=(5, 0), textcoords="offset points", fontsize=8, color=plotting.INK_SECONDARY)
     ax.set_xscale("log")
-    tv_below = summary["votes_by_type"]["tv"]["below_min_votes_share"]
-    ax.set(title=f"{tv_below:.0%} of TV titles have fewer than {MIN_VOTES} votes", xlabel="Vote count + 1 (log scale)", ylabel="Titles")
+    tv_below = summary["votes_by_type"]["tv"]["below_5_share"]
+    ax.set(title=f"{tv_below:.0%} of TV titles have fewer than {RELIABLE_VOTES} votes", xlabel="Vote count + 1 (log scale)", ylabel="Titles")
     ax.legend()
     plotting.save(fig, output / "eda_vote_counts.png")
 
     # 4. Vote average by type
-    voted = catalogue[catalogue["vote_count"] >= MIN_VOTES]
-    means = summary["mean_vote_average_by_type_min_votes"]
+    voted = catalogue[catalogue["vote_count"] >= RELIABLE_VOTES]
+    means = summary["mean_vote_average_by_type_5_votes"]
     fig, ax = plt.subplots(figsize=(8, 4.5))
     for t in TYPES:
         ax.hist(voted.loc[voted["type"].eq(t), "vote_average"], bins=np.arange(0, 10.25, 0.25), histtype="step", linewidth=2, color=plotting.TYPE_COLOURS[t], label=f"{'TV' if t == 'tv' else 'Movie'} (mean {means[t]:.1f})")
         ax.axvline(means[t], color=plotting.TYPE_COLOURS[t], linewidth=1)
-    ax.set(title="TV titles score higher than movies, so rating-based popularity favours TV", xlabel=f"Vote average (titles with at least {MIN_VOTES} votes)", ylabel="Titles")
+    ax.set(title="TV titles score higher than movies, so rating-based popularity favours TV", xlabel=f"Vote average (titles with at least {RELIABLE_VOTES} votes)", ylabel="Titles")
     ax.legend()
     plotting.save(fig, output / "eda_vote_average_by_type.png")
 

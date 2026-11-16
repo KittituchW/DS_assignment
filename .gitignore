@@ -20,3 +20,6 @@ slides/
 
 # Keep only the final PDF presentation in the repository.
 !slide/*.pdf
+
+# Caches inside extra run folders, such as the sensitivity run
+artifacts/*/cache/

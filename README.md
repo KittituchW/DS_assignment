@@ -58,23 +58,27 @@ design:
 | Finding | Figure | Decision |
 |---|---|---|
 | Two files, 16,000 rows each. No viewer, event or rating table. `popularity`, `vote_count` and `vote_average` are global TMDb aggregates | | Simulate viewers; use TMDb signals as item features and as the popularity baseline |
-| `show_id` collides across files (397 ids) and repeats inside TV (9 ids) | | Item key is `movie_<id>` or `tv_<id>`; keep the most complete duplicate |
+| `show_id` collides across files: TMDb numbers movies and TV separately, so 397 ids name two different titles (18823 is the movie *Clash of the Titans* and the TV show *Growing Through Life*). 9 ids repeat inside TV | `eda_summary.json` | Item key is `movie_<id>` or `tv_<id>`; keep the most complete duplicate |
+| 696 names repeat within a type, always with a different release year (remakes, such as *19-2* in 2011 and 2014) | `eda_summary.json` | Same name, type and year collapse to one row; different years are kept as different titles |
 | Exactly 1,000 titles per type and year | | A stratified sample, not the real catalogue; no claims about catalogue growth |
 | `rating` copies `vote_average`; `duration` is empty for movies and constant for TV | | Both dropped |
 | TV and movie genre vocabularies differ | | TV labels mapped onto the movie set |
-| 51% of TV titles have fewer than 5 votes (median 4), against 9% of movies | `eda_vote_counts.png`, `eda_cleaning_funnel.png` | Keep the 5-vote minimum (no evidence of being watched), and state that recommendable titles become 65% movies |
+| Raw averages reward tiny vote counts: 97 of the 100 highest-rated titles have fewer than 5 votes, all at 10/10 | `eda_summary.json` | Bayesian rating with a prior of 50 votes; the top 100 then has a median of 1,490 votes |
+| 51% of TV titles have fewer than 5 votes (median 4), against 9% of movies. With full metadata, a 5-vote floor would cut 4,833 TV titles, 80% of them non-English, and 58% of the 2025 releases that have at least one vote | `eda_vote_counts.png`, `eda_summary.json` | Floor of 1 vote (a title with no votes has no evidence of an audience). Rating noise is left to the Bayesian rating. The 5-vote floor is kept as a sensitivity run. Changed on 2026-11-17, see `HYPOTHESES.md` |
+| TV popularity runs about 3 times higher than movie popularity (median 36 against 11) | `eda_summary.json` | Popularity is a percentile within type |
 | A substring keyword filter removed mainstream titles: "lover" inside *10 Cloverfield Lane*, "lust" inside *Wanderlust* | `eda_cleaning_funnel.png` | Whole-word keywords, checked only on titles with fewer than 100 votes. Logged as a deviation in `HYPOTHESES.md` |
-| TV metadata is weaker: 68.5% of TV directors and 20% of TV descriptions are missing | `eda_missingness.png` | Text is one named feature group, so its value can be tested (H1) |
+| TV metadata is weaker: 68.5% of TV directors and 20% of TV descriptions are missing | `eda_missingness.png` | A title needs a genre and a description, so every title has real text for H1. Text is one named feature group, so its value can be tested |
 | Descriptions are in English for every original language | `eda_summary.json` | English TF-IDF is a fair text baseline |
-| 56% of titles are non-English, but English share rises from 48% in the least popular decile to 66% in the most popular | `eda_english_share_by_popularity.png` | Motivates H2 |
-| TV is 58% non-English, movies 38% | `eda_language_by_type.png` | Read H2 within each content type as well |
+| 56% of titles are non-English, but among recommendable titles English share rises from 44% in the least popular decile to 62% in the most popular | `eda_english_share_by_popularity.png` | Motivates H2 |
+| TV is 64% non-English, movies 39% | `eda_language_by_type.png` | Read H2 within each content type as well |
 | TV titles score about one point higher than movies (7.2 against 6.3) | `eda_vote_average_by_type.png` | The popularity baseline leans to TV; an exploratory type-balanced version checks H2a |
 | Movie popularity rises steadily with release year | `eda_popularity_by_year.png` | Popularity is a 2025 snapshot that partly means "new". Production needs popularity measured at event time |
-| Persona pools differ in size: 123 Korean romance titles against 10,400 drama titles | `eda_persona_pools.png` | A simulator limitation, stated with the results |
-| 92% of titles share a lead cast member with another title | `eda_summary.json` | Cast is a relationship the model does not use yet; a candidate feature for the next iteration |
+| Persona pools differ in size: 228 Korean titles in the K-drama pool against 12,176 titles in the C-drama genre pool | `eda_persona_pools.png` | A simulator limitation, stated with the results |
+| 90% of titles share a lead cast member with another title | `eda_summary.json` | Cast is a relationship the model does not use yet; a candidate feature for the next iteration |
 | No maturity rating | | The keyword filter is known to be incomplete; production needs a licensed maturity feed |
 
-Clean catalogue: 31,915 titles, 22,059 recommendable.
+Clean catalogue: 31,915 titles, 25,280 recommendable (41.5% TV, 49.3% non-English).
+With the 5-vote floor of the sensitivity run: 21,700 recommendable (34% TV, 44.2% non-English).
 
 ## 3. Research design
 
@@ -147,10 +151,11 @@ pip install -r requirements.txt
 python run_experiment.py --download    # downloads the two CSVs into data/raw, then runs every stage
 ```
 
-The full run takes about 30 minutes on a laptop CPU: under a minute to
+The full run takes about 35 minutes on a laptop CPU: under a minute to
 prepare, seconds for the baselines, 30 to 50 seconds per two tower run
-(12 runs), and about 20 minutes for the settings search and the tuned runs.
-Skip the search with `--stages prepare baselines train analyse`. The
+(12 runs), about 20 minutes for the settings search and the tuned runs, and
+about 4 minutes for the cold-start test. Skip the extras with
+`--stages prepare baselines train analyse`. The
 download is pinned to one commit of the dataset repository and the run checks
 each file's SHA-256.
 
@@ -160,6 +165,9 @@ Stages can be run on their own:
 python run_experiment.py --stages prepare baselines analyse   # no PyTorch needed
 python run_experiment.py --stages train analyse               # after prepare
 python run_experiment.py --stages tune analyse                # settings search, after train
+python run_experiment.py --stages coldstart analyse           # item cold-start test, after prepare
+python run_experiment.py --min-votes 5 --output artifacts/sensitivity_min5 \
+    --stages prepare baselines train analyse                  # 5-vote sensitivity run
 python run_experiment.py --stages analyse                     # rebuild tables from saved runs
 pytest -q                                                     # unit and pipeline tests
 ```
@@ -204,7 +212,8 @@ committed because the run regenerates it.
 2. Persona pools differ a lot in size, so some personas are easier to predict
    than others.
 3. No real behaviour, so no estimate of real watch lift.
-4. The vote filter makes the recommendable catalogue 65% movies.
+4. The 1-vote floor still drops 23% of TV titles (no votes at all), mostly new and
+   non-English. The item cold-start test covers titles the model never saw.
 5. The adult filter is a keyword list. Production needs a licensed maturity
    and rights feed.
 6. Popularity is a 2025 snapshot used for 2023 to 2025 events. The simulator

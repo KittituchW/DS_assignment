@@ -234,6 +234,37 @@ def tuned_summary(run_dir: Path, exponents: list[float], main_exponent: float, s
     }
 
 
+def _meta(run_dir: Path, model: str, exponent: float, seed: int | None) -> dict | None:
+    path = run_path(run_dir, model, exponent, seed)
+    return json.loads(str(np.load(path, allow_pickle=False)["meta"])) if path.exists() else None
+
+
+def cold_start_summary(run_dir: Path, exponent: float, seeds: list[int]) -> dict | None:
+    """Exploratory: ranking titles no model saw in training. Two tower is averaged over seeds."""
+    runs = {
+        "two_tower": [load_run(run_dir, "cold_two_tower", exponent, s) for s in seeds],
+        "content_knn": [load_run(run_dir, "cold_content_knn", exponent, None)],
+        "popularity": [load_run(run_dir, "cold_popularity", exponent, None)],
+    }
+    if any(r is None for rs in runs.values() for r in rs):
+        return None
+    meta = _meta(run_dir, "cold_content_knn", exponent, None)
+    means = {name: {m: np.mean([r[m] for r in rs], axis=0) for m in ("recall", "hit", "ndcg")} for name, rs in runs.items()}
+    out = {
+        "exponent": exponent,
+        "seeds": seeds,
+        "cold_items": meta["cold_items"],
+        "viewers": meta["viewers"],
+        "random_recall@10": meta["random_recall@10"],
+        "models": {name: {f"{m}@10": float(np.nanmean(v)) for m, v in ms.items()} for name, ms in means.items()},
+    }
+    for base in ("content_knn", "popularity"):
+        out[f"two_tower_minus_{base}"] = {
+            f"{m}@10": _interval(paired_bootstrap(means["two_tower"][m] - means[base][m], BOOTSTRAP_SAMPLES)) for m in ("recall", "hit")
+        }
+    return out
+
+
 # ------------------------------------------------------------------ sample recommendations
 
 
@@ -305,7 +336,8 @@ def _comparison_table(rows: list[dict]) -> str:
 
 
 def results_summary(
-    runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dict] | None = None, tuned: dict | None = None
+    runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dict] | None = None, tuned: dict | None = None,
+    cold: dict | None = None,
 ) -> str:
     lines = [
         "# Results summary (generated)",
@@ -399,6 +431,23 @@ def results_summary(
             "",
             "Tuned two tower non-English gap against held-out watches: "
             + ", ".join(f"p = {g['exponent']:g}: {_pts(g.get('gap'))}" for g in tuned["h2_gap"]),
+            "",
+        ]
+    if cold:
+        table = pd.DataFrame([{"model": name, **vals} for name, vals in cold["models"].items()])
+        lines += [
+            "## Item cold start (exploratory)",
+            "",
+            f"{cold['cold_items']:,} titles were held out of training at p = {cold['exponent']:g}. Each of {cold['viewers']:,} viewers",
+            "with a held-out watch gets a top 10 drawn from the held-out titles only. A random top 10 would find",
+            f"Recall@10 of about {cold['random_recall@10']:.4f}.",
+            "",
+            markdown_table(table, "{:.4f}"),
+            "",
+            "Two tower minus content kNN: Recall@10 " + _pts(cold["two_tower_minus_content_knn"]["recall@10"])
+            + ", Hit@10 " + _pts(cold["two_tower_minus_content_knn"]["hit@10"]) + ".",
+            "Two tower minus popularity: Recall@10 " + _pts(cold["two_tower_minus_popularity"]["recall@10"])
+            + ", Hit@10 " + _pts(cold["two_tower_minus_popularity"]["hit@10"]) + ".",
             "",
         ]
     return "\n".join(lines)

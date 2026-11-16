@@ -6,7 +6,7 @@ from scipy import sparse
 
 torch = pytest.importorskip("torch")
 
-from recommender.two_tower import TrainConfig, train_two_tower  # noqa: E402
+from recommender.two_tower import TrainConfig, embed_items, train_two_tower  # noqa: E402
 
 
 def _toy_problem(n_users: int = 30, n_items: int = 40, seed: int = 0):
@@ -52,3 +52,13 @@ def test_every_activation_in_the_search_space_trains(activation: str) -> None:
     _, table, losses = train_two_tower(feats, history, cfg, log=False)
     np.testing.assert_allclose(np.linalg.norm(table, axis=1), 1.0, atol=1e-5)
     assert losses[-1] < losses[0]
+
+
+def test_embed_items_scores_titles_the_tower_never_saw() -> None:
+    feats, history = _toy_problem()
+    warm = np.arange(30)
+    tower, table, _ = train_two_tower(feats[warm], history[:, warm], TrainConfig(embed_dim=8, hidden=16, epochs=2, batch_size=64), log=False)
+    full = embed_items(tower, feats)
+    assert full.shape == (feats.shape[0], 8)
+    np.testing.assert_allclose(full[warm], table, atol=1e-5)
+    np.testing.assert_allclose(np.linalg.norm(full, axis=1), 1.0, atol=1e-5)

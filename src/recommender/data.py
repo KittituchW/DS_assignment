@@ -14,10 +14,14 @@ Cleaning decisions (each one comes from an EDA finding, see `eda.py`):
    variation. Both are dropped.
 5. Budget and revenue of 0 mean "unknown". They become missing values.
 6. TV genre labels are mapped onto the movie genre vocabulary.
-7. Titles with no genre and no description, titles with fewer than
-   `MIN_VOTES` votes, and low-vote titles that match an adult keyword list are
-   kept in the table but flagged `recommendable = False`, with one column per
-   reason. Keywords match whole words only, and only titles with fewer than
+7. Titles missing a genre or a description, titles with fewer than
+   `min_votes` votes (default `MIN_VOTES` = 1), and low-vote titles that match
+   an adult keyword list are kept in the table but flagged
+   `recommendable = False`, with one column per reason. The floor was 5 votes
+   until 2026-11-16: EDA showed it removed half of the TV titles, 84% of them
+   non-English, which biases the H2 test. Noise in low-vote ratings is handled
+   by the Bayesian rating (rule 10), so the floor now only drops titles with no
+   votes at all. See HYPOTHESES.md. Keywords match whole words only, and only titles with fewer than
    `ADULT_MAX_VOTES` votes are checked: EDA showed that substring matching
    removed mainstream titles ("lover" inside "10 Cloverfield Lane", "lust"
    inside "Wanderlust"), while the adult cluster sits in low-vote titles. The
@@ -62,8 +66,9 @@ GENRE_MAP: dict[str, list[str]] = {
     "Unknown": [],
 }
 
-# A title with fewer votes than this has no evidence of ever being watched.
-MIN_VOTES = 5
+# A title with no votes has no evidence of ever being watched. Rating noise in
+# low-vote titles is handled by the Bayesian rating, not by this floor.
+MIN_VOTES = 1
 
 # Bounded keyword list for a low-vote adult cluster. Not a maturity system.
 # Titles with at least ADULT_MAX_VOTES votes are treated as mainstream and kept.
@@ -145,7 +150,7 @@ def bayesian_rating(vote_average: pd.Series, vote_count: pd.Series, prior_votes:
     return (vote_count * average + prior_votes * global_mean) / (vote_count + prior_votes)
 
 
-def build_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
+def build_catalogue(raw: pd.DataFrame, min_votes: int = MIN_VOTES) -> pd.DataFrame:
     """Return one clean item table. See the module docstring for each rule."""
     df = raw.copy()
     df["type"] = df["type"].map({"Movie": "movie", "TV Show": "tv"})
@@ -178,11 +183,11 @@ def build_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
 
     # 7: recommendable flag, one column per reason
     df["vote_count"] = df["vote_count"].fillna(0).astype(int)
-    df["excluded_no_content"] = df["genres"].map(len).eq(0) & df["description"].str.len().eq(0)
-    df["excluded_low_votes"] = df["vote_count"] < MIN_VOTES
+    df["excluded_missing_metadata"] = df["genres"].map(len).eq(0) | df["description"].str.len().eq(0)
+    df["excluded_low_votes"] = df["vote_count"] < min_votes
     keyword = df["title"].str.lower().str.contains(ADULT_PATTERN, regex=True)
     df["excluded_adult_keyword"] = keyword & (df["vote_count"] < ADULT_MAX_VOTES)
-    df["recommendable"] = ~(df["excluded_no_content"] | df["excluded_low_votes"] | df["excluded_adult_keyword"])
+    df["recommendable"] = ~(df["excluded_missing_metadata"] | df["excluded_low_votes"] | df["excluded_adult_keyword"])
 
     # 9 and 10
     df["popularity"] = df["popularity"].fillna(0.0)
@@ -195,7 +200,7 @@ def build_catalogue(raw: pd.DataFrame) -> pd.DataFrame:
         "item_id", "type", "show_id", "title", "director", "cast", "country", "language",
         "is_english", "date_added", "release_year", "genres", "description", "popularity",
         "popularity_pct", "vote_count", "vote_average", "weighted_rating", "budget", "revenue",
-        "has_financials", "metadata_completeness", "excluded_no_content", "excluded_low_votes",
+        "has_financials", "metadata_completeness", "excluded_missing_metadata", "excluded_low_votes",
         "excluded_adult_keyword", "recommendable",
     ]
     return df[cols].sort_values("item_id").reset_index(drop=True)

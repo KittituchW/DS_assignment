@@ -17,6 +17,9 @@ Metrics at k, computed per viewer so they can be bootstrapped:
 Catalogue level:
     coverage@k      share of recommendable items that appear in anyone's top k
 
+Cold start (exploratory): `cold_start_split` hides a share of titles from
+training entirely and `evaluate_cold` ranks only those titles.
+
 A scorer maps a block of viewer history rows to a score matrix (viewers x items).
 Items a viewer already watched in training are never recommended.
 """
@@ -87,6 +90,28 @@ def validation_split(split: Split, val_frac: float = 0.2) -> Split:
     is never seen while choosing settings.
     """
     return temporal_split(split.train, list(split.item_index), val_frac)
+
+
+def cold_start_split(events: pd.DataFrame, items: pd.DataFrame, frac: float = 0.1, seed: int = 0) -> tuple[Split, np.ndarray]:
+    """Item cold start: hold out a share of titles, stratified by type, from training entirely.
+
+    Train is every event on the other titles. Test is every event on the held-out
+    titles, so no model has seen a single watch of them. Returns the split and a
+    boolean mask over `items` marking the held-out ("new") titles.
+    """
+    rng = np.random.default_rng(seed)
+    cold = np.zeros(len(items), dtype=bool)
+    for positions in items.reset_index(drop=True).groupby("type").indices.values():
+        size = max(1, int(round(len(positions) * frac)))
+        cold[rng.choice(positions, size=size, replace=False)] = True
+    is_cold = events["item_id"].isin(set(items["item_id"].to_numpy()[cold])).to_numpy()
+    split = Split(
+        train=events[~is_cold].reset_index(drop=True),
+        test=events[is_cold].reset_index(drop=True),
+        user_ids=sorted(events["user_id"].unique()),
+        item_index={it: i for i, it in enumerate(items["item_id"])},
+    )
+    return split, cold
 
 
 def top_k(scores: np.ndarray, history: sparse.csr_matrix, k: int) -> np.ndarray:
@@ -174,6 +199,33 @@ def evaluate(scorer: Scorer, split: Split, items: pd.DataFrame, k: int = 10) -> 
     recs = recommend(scorer, history, k)
     per_user = per_user_metrics(recs, split.test_matrix(), items, k, ratio=split.test_ratio_matrix())
     return summarise(per_user, recs, len(items), k), per_user
+
+
+def evaluate_cold(
+    scorer: Scorer, split: Split, items: pd.DataFrame, cold: np.ndarray, k: int = 10
+) -> tuple[dict[str, float], dict[str, np.ndarray]]:
+    """Rank only the held-out titles ("new this week" row). Viewers with no held-out watch are left out."""
+
+    def cold_only(history: sparse.csr_matrix) -> np.ndarray:
+        scores = np.array(scorer(history), dtype=np.float32, copy=True)
+        scores[:, ~cold] = -np.inf
+        return scores
+
+    recs = recommend(cold_only, split.history_matrix(), k)
+    test = split.test_matrix()
+    per_user = per_user_metrics(recs, test, items, k, ratio=split.test_ratio_matrix())
+    has_test = np.diff(test.indptr) > 0
+    per_user = {key: values[has_test] for key, values in per_user.items()}
+    summary = {
+        f"recall@{k}": float(np.nanmean(per_user["recall"])),
+        f"ndcg@{k}": float(np.nanmean(per_user["ndcg"])),
+        f"hit@{k}": float(np.nanmean(per_user["hit"])),
+        f"cold_coverage@{k}": float(len(np.unique(recs[has_test, :k])) / max(int(cold.sum()), 1)),
+        "viewers": int(has_test.sum()),
+        "cold_items": int(cold.sum()),
+        f"random_recall@{k}": float(k / max(int(cold.sum()), 1)),
+    }
+    return summary, per_user
 
 
 def paired_bootstrap(diff: np.ndarray, n: int = 2000, seed: int = 0) -> tuple[float, float, float]:

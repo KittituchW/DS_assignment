@@ -30,14 +30,23 @@ def test_duplicate_id_keeps_the_most_complete_row(raw: pd.DataFrame) -> None:
 
 def test_recommendable_rules(raw: pd.DataFrame) -> None:
     raw = raw.copy()
-    raw.loc[1, "vote_count"] = 2  # too few votes
+    raw.loc[1, "vote_count"] = 0  # no votes at all
     raw.loc[2, ["title", "vote_count"]] = ["Erotic Story", 30]  # adult keyword, low votes
-    raw.loc[3, ["genres", "description"]] = np.nan  # no content
+    raw.loc[3, "description"] = np.nan  # a genre but no description
+    raw.loc[4, "vote_count"] = 2  # few votes, but some: kept at the default floor
     cat = build_catalogue(raw).set_index("item_id")
-    for i, reason in ((1, "excluded_low_votes"), (2, "excluded_adult_keyword"), (3, "excluded_no_content")):
+    for i, reason in ((1, "excluded_low_votes"), (2, "excluded_adult_keyword"), (3, "excluded_missing_metadata")):
         row = cat.loc[f"movie_{raw.loc[i, 'show_id']}"]
         assert row[reason] and not row["recommendable"]
     assert cat.loc[f"movie_{raw.loc[4, 'show_id']}", "recommendable"]
+
+
+def test_vote_floor_is_a_parameter(raw: pd.DataFrame) -> None:
+    raw = raw.copy()
+    raw.loc[4, "vote_count"] = 2
+    key = f"movie_{raw.loc[4, 'show_id']}"
+    assert build_catalogue(raw, min_votes=1).set_index("item_id").loc[key, "recommendable"]
+    assert not build_catalogue(raw, min_votes=5).set_index("item_id").loc[key, "recommendable"]
 
 
 def test_adult_keywords_match_whole_words_on_low_vote_titles_only(raw: pd.DataFrame) -> None:
