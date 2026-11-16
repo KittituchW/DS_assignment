@@ -1,0 +1,19 @@
+column,dtype,missing_movie_pct,missing_tv_pct,distinct,meaning
+show_id,int64,0.0,0.0,31594,Source id. Unique per file only; collides across files
+type,object,0.0,0.0,2,Movie or TV Show
+title,object,0.0,0.0,30639,Display title
+director,object,0.8,68.5,13011,Comma-separated names
+cast,object,1.3,7.2,30230,Comma-separated names
+country,object,2.9,11.2,1745,Comma-separated production countries
+date_added,object,0.0,0.0,5504,Same year as release_year for every row
+release_year,int64,0.0,0.0,16,2010 to 2025
+rating,float64,0.0,0.0,2728,Exact copy of vote_average
+duration,object,100.0,0.0,1,"Missing for movies, constant for TV"
+genres,object,0.7,6.1,3895,Comma-separated; TV and movie vocabularies differ
+language,object,0.0,0.0,83,ISO 639-1 original language
+description,object,0.8,20.0,28636,Free-text synopsis
+popularity,float64,0.0,0.0,24159,TMDb popularity snapshot; scale differs by type
+vote_count,int64,0.0,0.0,2902,"TMDb votes; aggregate, not per viewer"
+vote_average,float64,0.0,0.0,2728,TMDb average score
+budget,float64,0.0,100.0,958,Movies only; 0 means unknown
+revenue,float64,0.0,100.0,5327,Movies only; 0 means unknown

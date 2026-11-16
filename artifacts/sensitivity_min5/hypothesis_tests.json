@@ -1,0 +1,395 @@
+{
+  "H1": {
+    "exponent": 6.0,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "models": [
+      "two_tower",
+      "two_tower_no_text"
+    ],
+    "recall@10_full": 0.028615942760942762,
+    "recall@10_no_text": 0.030597618122618124,
+    "recall@10_difference": {
+      "mean": -0.0019816753616753616,
+      "ci_low": -0.0038911426790801795,
+      "ci_high": -4.401540357790367e-05
+    },
+    "ndcg@10_full": 0.02516934045342667,
+    "ndcg@10_no_text": 0.027005316369353022,
+    "ndcg@10_difference": {
+      "mean": -0.0018359759159263498,
+      "ci_low": -0.0034847401467484117,
+      "ci_high": -0.0001571321488817257
+    },
+    "per_seed": [
+      {
+        "seed": 42,
+        "recall@10_full": 0.028482558645058647,
+        "recall@10_no_text": 0.030786644836644835
+      },
+      {
+        "seed": 43,
+        "recall@10_full": 0.02745214738964739,
+        "recall@10_no_text": 0.03040482064232064
+      },
+      {
+        "seed": 44,
+        "recall@10_full": 0.030619479131979127,
+        "recall@10_no_text": 0.03134914113664114
+      },
+      {
+        "seed": 45,
+        "recall@10_full": 0.028769190531690532,
+        "recall@10_no_text": 0.030658019295519295
+      },
+      {
+        "seed": 46,
+        "recall@10_full": 0.027756338106338107,
+        "recall@10_no_text": 0.029789464701964703
+      }
+    ],
+    "verdict": "rejected: text hurts"
+  },
+  "H2": {
+    "rule_h2a": "popularity gap upper bound below -10 points at every p",
+    "rule_h2b": "two tower gap interval inside +/-5 points at every p",
+    "exploratory_models": [
+      "popularity_by_type"
+    ],
+    "by_exponent": [
+      {
+        "exponent": 2.0,
+        "popularity": {
+          "non_en@10": 0.0029333333333333334,
+          "heldout_non_en": 0.4298882215007215,
+          "gap": {
+            "mean": -0.42695488816738814,
+            "ci_low": -0.4372703328731454,
+            "ci_high": -0.4174148758417508
+          }
+        },
+        "most_watched": {
+          "non_en@10": 0.10270000000000001,
+          "heldout_non_en": 0.4298882215007215,
+          "gap": {
+            "mean": -0.3271882215007215,
+            "ci_low": -0.33736511385605134,
+            "ci_high": -0.31732613323019576
+          }
+        },
+        "content_knn": {
+          "non_en@10": 0.1484333333333333,
+          "heldout_non_en": 0.4298882215007215,
+          "gap": {
+            "mean": -0.2814548881673882,
+            "ci_low": -0.29363362122830866,
+            "ci_high": -0.2690366978854479
+          }
+        },
+        "two_tower": {
+          "non_en@10": 0.43016666666666664,
+          "heldout_non_en": 0.4298882215007215,
+          "gap": {
+            "mean": 0.0002784451659451725,
+            "ci_low": -0.012174783942908933,
+            "ci_high": 0.01264157852564102
+          }
+        },
+        "popularity_by_type": {
+          "non_en@10": 0.09983333333333333,
+          "heldout_non_en": 0.4298882215007215,
+          "gap": {
+            "mean": -0.3300548881673882,
+            "ci_low": -0.3402802718346468,
+            "ci_high": -0.320314430511618
+          }
+        },
+        "two_tower_seeds": [
+          42
+        ]
+      },
+      {
+        "exponent": 6.0,
+        "popularity": {
+          "non_en@10": 0.006066666666666667,
+          "heldout_non_en": 0.3840452598327599,
+          "gap": {
+            "mean": -0.37797859316609317,
+            "ci_low": -0.3875668858918859,
+            "ci_high": -0.3679697292522292
+          }
+        },
+        "most_watched": {
+          "non_en@10": 0.060833333333333336,
+          "heldout_non_en": 0.3840452598327599,
+          "gap": {
+            "mean": -0.32321192649942654,
+            "ci_low": -0.33294941668285416,
+            "ci_high": -0.3127706152181152
+          }
+        },
+        "content_knn": {
+          "non_en@10": 0.1232,
+          "heldout_non_en": 0.3840452598327599,
+          "gap": {
+            "mean": -0.2608452598327598,
+            "ci_low": -0.2724669396691271,
+            "ci_high": -0.24952307736245233
+          }
+        },
+        "two_tower": {
+          "non_en@10": 0.38024,
+          "heldout_non_en": 0.3840452598327599,
+          "gap": {
+            "mean": -0.003805259832759822,
+            "ci_low": -0.01569746654271653,
+            "ci_high": 0.007610480475542984
+          }
+        },
+        "popularity_by_type": {
+          "non_en@10": 0.0995,
+          "heldout_non_en": 0.3840452598327599,
+          "gap": {
+            "mean": -0.2845452598327598,
+            "ci_low": -0.2941301025594776,
+            "ci_high": -0.27449122781154034
+          }
+        },
+        "two_tower_seeds": [
+          42,
+          43,
+          44,
+          45,
+          46
+        ]
+      },
+      {
+        "exponent": 12.0,
+        "popularity": {
+          "non_en@10": 0.01103333333333333,
+          "heldout_non_en": 0.3714075956450956,
+          "gap": {
+            "mean": -0.36037426231176234,
+            "ci_low": -0.37039201475607725,
+            "ci_high": -0.35072133179320675
+          }
+        },
+        "most_watched": {
+          "non_en@10": 0.12446666666666668,
+          "heldout_non_en": 0.3714075956450956,
+          "gap": {
+            "mean": -0.24694092897842895,
+            "ci_low": -0.2575937963772339,
+            "ci_high": -0.23644839863839862
+          }
+        },
+        "content_knn": {
+          "non_en@10": 0.11686666666666667,
+          "heldout_non_en": 0.3714075956450956,
+          "gap": {
+            "mean": -0.254540928978429,
+            "ci_low": -0.2660857537254413,
+            "ci_high": -0.24313480401542903
+          }
+        },
+        "two_tower": {
+          "non_en@10": 0.4208666666666666,
+          "heldout_non_en": 0.3714075956450956,
+          "gap": {
+            "mean": 0.04945907102157103,
+            "ci_low": 0.037291975663225674,
+            "ci_high": 0.06066068685943686
+          }
+        },
+        "popularity_by_type": {
+          "non_en@10": 0.09929999999999999,
+          "heldout_non_en": 0.3714075956450956,
+          "gap": {
+            "mean": -0.2721075956450956,
+            "ci_low": -0.2819890042365042,
+            "ci_high": -0.26232744285806786
+          }
+        },
+        "two_tower_seeds": [
+          42
+        ]
+      }
+    ],
+    "by_type_at_main_exponent": [
+      {
+        "model": "popularity",
+        "tv_share": 0.8998333333333334,
+        "non_en_within_movies": 0.005990016638935108,
+        "non_en_within_tv": 0.0060751991109464715
+      },
+      {
+        "model": "most_watched",
+        "tv_share": 0.40296666666666664,
+        "non_en_within_movies": 0.09614203562056836,
+        "non_en_within_tv": 0.008520142278104062
+      },
+      {
+        "model": "content_knn",
+        "tv_share": 0.3023666666666667,
+        "non_en_within_movies": 0.0499307181422906,
+        "non_en_within_tv": 0.2922500275603572
+      },
+      {
+        "model": "two_tower",
+        "tv_share": 0.37560666666666664,
+        "non_en_within_movies": 0.28685977855838735,
+        "non_en_within_tv": 0.5354715038781704
+      },
+      {
+        "model": "popularity_by_type",
+        "tv_share": 0.29773333333333335,
+        "non_en_within_movies": 0.14168407062844124,
+        "non_en_within_tv": 0.0
+      },
+      {
+        "model": "held-out watches",
+        "tv_share": 0.3274818401937046,
+        "non_en_within_movies": 0.31359135913591357,
+        "non_en_within_tv": 0.5451016635859519
+      }
+    ],
+    "h2a_verdict": "supported",
+    "h2b_verdict": "not supported",
+    "two_tower_gap_trend": "does not fall steadily as p rises"
+  },
+  "exploratory_two_tower_vs_content_knn": [
+    {
+      "exponent": 2.0,
+      "model": "two_tower",
+      "baseline": "content_knn",
+      "recall@10_model": 0.014705904743404745,
+      "recall@10_baseline": 0.011456111481111482,
+      "recall@10_difference": {
+        "mean": 0.0032497932622932626,
+        "ci_low": 0.0004903999819624819,
+        "ci_high": 0.0058813292263292264
+      },
+      "hit@10_model": 0.08033333333333334,
+      "hit@10_baseline": 0.05633333333333333,
+      "hit@10_difference": {
+        "mean": 0.024,
+        "ci_low": 0.012991666666666667,
+        "ci_high": 0.035333333333333335
+      },
+      "recall_w@10_model": 0.016867322847247124,
+      "recall_w@10_baseline": 0.013278220780193806,
+      "recall_w@10_difference": {
+        "mean": 0.003589101128280163,
+        "ci_low": 0.0003999777531561752,
+        "ci_high": 0.006717521244691064
+      }
+    },
+    {
+      "exponent": 6.0,
+      "model": "two_tower",
+      "baseline": "content_knn",
+      "recall@10_model": 0.028615942760942762,
+      "recall@10_baseline": 0.01841772533022533,
+      "recall@10_difference": {
+        "mean": 0.01019821743071743,
+        "ci_low": 0.007095283496595996,
+        "ci_high": 0.013450972772597772
+      },
+      "hit@10_model": 0.14273333333333332,
+      "hit@10_baseline": 0.09533333333333334,
+      "hit@10_difference": {
+        "mean": 0.0474,
+        "ci_low": 0.03426666666666667,
+        "ci_high": 0.06160166666666666
+      },
+      "recall_w@10_model": 0.03320445120334625,
+      "recall_w@10_baseline": 0.020315159112215042,
+      "recall_w@10_difference": {
+        "mean": 0.012889292184263467,
+        "ci_low": 0.009424776742320198,
+        "ci_high": 0.016558499761205162
+      }
+    },
+    {
+      "exponent": 12.0,
+      "model": "two_tower",
+      "baseline": "content_knn",
+      "recall@10_model": 0.053384060846560846,
+      "recall@10_baseline": 0.02252080280830281,
+      "recall@10_difference": {
+        "mean": 0.03086325803825804,
+        "ci_low": 0.02652185231435231,
+        "ci_high": 0.03519781333250083
+      },
+      "hit@10_model": 0.23166666666666666,
+      "hit@10_baseline": 0.11433333333333333,
+      "hit@10_difference": {
+        "mean": 0.11733333333333333,
+        "ci_low": 0.1,
+        "ci_high": 0.13366666666666666
+      },
+      "recall_w@10_model": 0.06146303936839104,
+      "recall_w@10_baseline": 0.024956494569778442,
+      "recall_w@10_difference": {
+        "mean": 0.03650654532201588,
+        "ci_low": 0.031454382073227316,
+        "ci_high": 0.04142756639903721
+      }
+    }
+  ],
+  "exploratory_tuned_two_tower": null,
+  "exploratory_cold_start": null,
+  "exploratory_oracle": [
+    {
+      "exponent": 2.0,
+      "oracle_recall@10": 0.045940701428201426,
+      "oracle_hit@10": 0.21133333333333335,
+      "oracle_no_text_recall@10": 0.024776845376845377,
+      "text_share_of_ceiling": 0.4606776865266642,
+      "two_tower_recall@10": 0.014705904743404745,
+      "two_tower_share_of_ceiling": 0.3201062301233671,
+      "content_knn_recall@10": 0.011456111481111482,
+      "content_knn_share_of_ceiling": 0.24936736107557483,
+      "most_watched_recall@10": 0.0033067751692751686,
+      "most_watched_share_of_ceiling": 0.07197920507250358,
+      "popularity_recall@10": 0.0006673400673400674,
+      "popularity_share_of_ceiling": 0.014526118378558543
+    },
+    {
+      "exponent": 6.0,
+      "oracle_recall@10": 0.07707699106449106,
+      "oracle_hit@10": 0.326,
+      "oracle_no_text_recall@10": 0.05088378982128982,
+      "text_share_of_ceiling": 0.33983165250035696,
+      "two_tower_recall@10": 0.02861594276094276,
+      "two_tower_share_of_ceiling": 0.3712643989566163,
+      "content_knn_recall@10": 0.01841772533022533,
+      "content_knn_share_of_ceiling": 0.2389523134707612,
+      "most_watched_recall@10": 0.009230901043401045,
+      "most_watched_share_of_ceiling": 0.11976208354679363,
+      "popularity_recall@10": 0.002134894272394272,
+      "popularity_share_of_ceiling": 0.02769820465108693
+    },
+    {
+      "exponent": 12.0,
+      "oracle_recall@10": 0.11829023707773707,
+      "oracle_hit@10": 0.44,
+      "oracle_no_text_recall@10": 0.09073715034965035,
+      "text_share_of_ceiling": 0.23292781728030176,
+      "two_tower_recall@10": 0.053384060846560846,
+      "two_tower_share_of_ceiling": 0.4512972681885684,
+      "content_knn_recall@10": 0.02252080280830281,
+      "content_knn_share_of_ceiling": 0.19038598082699557,
+      "most_watched_recall@10": 0.020061731786731787,
+      "most_watched_share_of_ceiling": 0.16959752793079425,
+      "popularity_recall@10": 0.0028560763310763308,
+      "popularity_share_of_ceiling": 0.02414464964846927
+    }
+  ],
+  "min_votes": 5
+}

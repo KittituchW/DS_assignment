@@ -1,0 +1,61 @@
+model,user,rank,title,type,language,release_year,vote_count,genres
+content_knn,user_A_action,1,Looper,movie,en,2012,10261,"Action, Science Fiction, Thriller"
+content_knn,user_A_action,2,In Time,movie,en,2011,11496,"Action, Science Fiction, Thriller"
+content_knn,user_A_action,3,Pacific Rim,movie,en,2013,12583,"Action, Adventure, Science Fiction"
+content_knn,user_A_action,4,After Earth,movie,en,2013,6578,"Action, Adventure, Science Fiction"
+content_knn,user_A_action,5,Iron Man 2,movie,en,2010,21222,"Action, Adventure, Science Fiction"
+content_knn,user_A_action,6,Captain America: The Winter Soldier,movie,en,2014,18956,"Action, Adventure, Science Fiction"
+content_knn,user_A_action,7,Guardians of the Galaxy,movie,en,2014,28308,"Action, Adventure, Science Fiction"
+content_knn,user_A_action,8,The Avengers,movie,en,2012,31285,"Action, Adventure, Science Fiction"
+content_knn,user_A_action,9,John Carter,movie,en,2012,5675,"Action, Adventure, Science Fiction"
+content_knn,user_A_action,10,X-Men: Days of Future Past,movie,en,2014,15454,"Action, Adventure, Science Fiction"
+content_knn,user_B_kdrama,1,True Beauty,tv,ko,2020,2284,"Comedy, Drama"
+content_knn,user_B_kdrama,2,Start-Up,tv,ko,2020,317,"Comedy, Drama"
+content_knn,user_B_kdrama,3,It's Okay to Not Be Okay,tv,ko,2020,1355,"Comedy, Drama"
+content_knn,user_B_kdrama,4,King the Land,tv,ko,2023,485,"Comedy, Drama"
+content_knn,user_B_kdrama,5,Hometown Cha-Cha-Cha,tv,ko,2021,557,"Comedy, Drama"
+content_knn,user_B_kdrama,6,Business Proposal,tv,ko,2022,569,"Comedy, Drama"
+content_knn,user_B_kdrama,7,Doctor Slump,tv,ko,2024,90,"Comedy, Drama"
+content_knn,user_B_kdrama,8,Love Next Door,tv,ko,2024,152,"Comedy, Drama"
+content_knn,user_B_kdrama,9,No Gain No Love,tv,ko,2024,193,"Comedy, Drama"
+content_knn,user_B_kdrama,10,Mr. Plankton,tv,ko,2024,75,"Comedy, Drama"
+content_knn,user_C_documentary,1,Explained,tv,en,2018,112,Documentary
+content_knn,user_C_documentary,2,Before the Flood,movie,en,2016,779,Documentary
+content_knn,user_C_documentary,3,Fahrenheit 11/9,movie,en,2018,436,Documentary
+content_knn,user_C_documentary,4,Game of Thrones: The Last Watch,movie,en,2019,326,Documentary
+content_knn,user_C_documentary,5,Nude,movie,en,2017,161,Documentary
+content_knn,user_C_documentary,6,The Great Hack,movie,en,2019,521,Documentary
+content_knn,user_C_documentary,7,X-Rated: The Greatest Adult Movies of All Time,movie,en,2015,186,Documentary
+content_knn,user_C_documentary,8,Andre the Giant,movie,en,2018,144,Documentary
+content_knn,user_C_documentary,9,After Porn Ends 2,movie,en,2017,236,Documentary
+content_knn,user_C_documentary,10,Mysteries of the Abandoned,tv,en,2017,18,Documentary
+two_tower,user_A_action,1,Transformers: Age of Extinction,movie,en,2014,8252,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,2,Maze Runner: The Death Cure,movie,en,2018,7891,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,3,Captain America: The Winter Soldier,movie,en,2014,18956,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,4,Boss Level,movie,en,2021,1663,"Action, Science Fiction, Thriller"
+two_tower,user_A_action,5,Terminator Genisys,movie,en,2015,8483,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,6,Transformers: Rise of the Beasts,movie,en,2023,4823,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,7,Terminator: Dark Fate,movie,en,2019,5203,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,8,Geostorm,movie,en,2017,4855,"Action, Science Fiction, Thriller"
+two_tower,user_A_action,9,Green Lantern,movie,en,2011,7281,"Action, Adventure, Science Fiction"
+two_tower,user_A_action,10,The Avengers,movie,en,2012,31285,"Action, Adventure, Science Fiction"
+two_tower,user_B_kdrama,1,King the Land,tv,ko,2023,485,"Comedy, Drama"
+two_tower,user_B_kdrama,2,True Beauty,tv,ko,2020,2284,"Comedy, Drama"
+two_tower,user_B_kdrama,3,Love Next Door,tv,ko,2024,152,"Comedy, Drama"
+two_tower,user_B_kdrama,4,Clean with Passion for Now,tv,ko,2018,52,"Comedy, Drama"
+two_tower,user_B_kdrama,5,Business Proposal,tv,ko,2022,569,"Comedy, Drama"
+two_tower,user_B_kdrama,6,My Love From Another Star,tv,ko,2013,777,"Comedy, Drama"
+two_tower,user_B_kdrama,7,Hospital Playlist,tv,ko,2020,130,"Comedy, Drama"
+two_tower,user_B_kdrama,8,My Sassy Girl,tv,ko,2017,27,"Comedy, Drama"
+two_tower,user_B_kdrama,9,Our Gap Soon,tv,ko,2016,5,"Comedy, Drama"
+two_tower,user_B_kdrama,10,Windy Mi Poong,tv,ko,2016,9,Drama
+two_tower,user_C_documentary,1,Great British Railway Journeys,tv,en,2010,11,Documentary
+two_tower,user_C_documentary,2,The Food That Built America,tv,en,2019,28,Documentary
+two_tower,user_C_documentary,3,Somebody Feed Phil,tv,en,2018,36,Documentary
+two_tower,user_C_documentary,4,Formula 1: Drive to Survive,tv,en,2019,495,Documentary
+two_tower,user_C_documentary,5,The Deepest Breath,movie,en,2023,152,Documentary
+two_tower,user_C_documentary,6,Eli Roth's History of Horror,tv,en,2018,42,Documentary
+two_tower,user_C_documentary,7,Crikey! It's the Irwins,tv,en,2018,15,Documentary
+two_tower,user_C_documentary,8,Antiques Road Trip,tv,en,2010,8,Documentary
+two_tower,user_C_documentary,9,Finding Your Roots,tv,en,2012,12,Documentary
+two_tower,user_C_documentary,10,Inside the Factory,tv,en,2015,12,Documentary

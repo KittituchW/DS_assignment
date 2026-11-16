@@ -1,0 +1,290 @@
+{
+  "config": {
+    "download": false,
+    "users": 3000,
+    "exponents": [
+      2.0,
+      6.0,
+      12.0
+    ],
+    "main_exponent": 6.0,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "epochs": 10,
+    "sim_seed": 42,
+    "min_votes": 5,
+    "tune_trials": 20,
+    "tune_seed": 0,
+    "cold_frac": 0.1,
+    "cold_seed": 0
+  },
+  "prepare": {
+    "input_sha256": {
+      "netflix_movies_detailed_up_to_2025.csv": "5439bcc05ccc4c170265a88e115891adecef64a330060dbd55266ac7fea14613",
+      "netflix_tv_shows_detailed_up_to_2025.csv": "16156fb21d0139a396b3a72cd58d66f86d272f7607df9281c2abfe68f59f80d7"
+    },
+    "eda": {
+      "raw_rows": {
+        "movie": 16000,
+        "tv": 16000
+      },
+      "rows_per_type_and_year": [
+        1000
+      ],
+      "show_id_shared_across_files": 397,
+      "tv_show_id_repeats": 9,
+      "catalogue_items": 31915,
+      "recommendable_items": 21700,
+      "min_votes": 5,
+      "funnel": {
+        "raw rows": {
+          "movie": 16000,
+          "tv": 16000
+        },
+        "after de-duplication": {
+          "movie": 15963,
+          "tv": 15952
+        },
+        "has genre and description": {
+          "movie": 15742,
+          "tv": 12274
+        },
+        "at least 5 votes": {
+          "movie": 14453,
+          "tv": 7406
+        },
+        "adult keyword filter": {
+          "movie": 14328,
+          "tv": 7372
+        }
+      },
+      "same_name_titles": {
+        "rows": 1497,
+        "names": 696,
+        "names_with_a_repeated_year": 0
+      },
+      "recommendable_movie_share": 0.66,
+      "rating_equals_vote_average": true,
+      "movie_duration_missing_pct": 100.0,
+      "tv_duration_values": [
+        "1 Seasons"
+      ],
+      "votes_by_type": {
+        "movie": {
+          "zero_share": 0.056,
+          "below_5_share": 0.093,
+          "below_floor_share": 0.093,
+          "median": 138.0
+        },
+        "tv": {
+          "zero_share": 0.229,
+          "below_5_share": 0.514,
+          "below_floor_share": 0.514,
+          "median": 4.0
+        }
+      },
+      "mean_vote_average_by_type_5_votes": {
+        "movie": 6.33,
+        "tv": 7.2
+      },
+      "median_raw_popularity_by_type": {
+        "movie": 10.9,
+        "tv": 36.2
+      },
+      "rating_noise": {
+        "top": 100,
+        "raw_top_share_under_5_votes": 0.97,
+        "raw_top_share_at_10": 1.0,
+        "raw_top_median_votes": 2.0,
+        "bayes_top_share_under_5_votes": 0.0,
+        "bayes_top_median_votes": 1490.0
+      },
+      "vote_floor_comparison": [
+        {
+          "min_votes": 0,
+          "titles": 27710,
+          "tv_share": 0.44,
+          "non_english_share": 0.51,
+          "titles_2025": 1539
+        },
+        {
+          "min_votes": 1,
+          "titles": 25280,
+          "tv_share": 0.415,
+          "non_english_share": 0.493,
+          "titles_2025": 564
+        },
+        {
+          "min_votes": 5,
+          "titles": 21700,
+          "tv_share": 0.34,
+          "non_english_share": 0.442,
+          "titles_2025": 235
+        }
+      ],
+      "tv_under_5_votes_with_metadata": {
+        "titles": 4833,
+        "non_english_share": 0.8
+      },
+      "median_genres_per_title": 2.0,
+      "non_english_share_catalogue": 0.563,
+      "non_english_share_recommendable": 0.442,
+      "non_english_share_by_type_recommendable": {
+        "movie": 0.378,
+        "tv": 0.568
+      },
+      "english_share_least_popular_decile": 0.477,
+      "english_share_most_popular_decile": 0.677,
+      "popularity_pct_median_by_year": {
+        "2010": 0.33,
+        "2011": 0.35,
+        "2012": 0.41,
+        "2013": 0.46,
+        "2014": 0.47,
+        "2015": 0.46,
+        "2016": 0.51,
+        "2017": 0.54,
+        "2018": 0.56,
+        "2019": 0.55,
+        "2020": 0.45,
+        "2021": 0.49,
+        "2022": 0.59,
+        "2023": 0.65,
+        "2024": 0.77,
+        "2025": 0.85
+      },
+      "description_mostly_non_latin_share": 0.0,
+      "cast_link_share": 0.921,
+      "persona_pools": [
+        {
+          "persona": "action",
+          "main_genre": "Action",
+          "titles": 4574,
+          "language": null,
+          "titles_in_language": NaN
+        },
+        {
+          "persona": "kdrama",
+          "main_genre": "Romance",
+          "titles": 2110,
+          "language": "ko",
+          "titles_in_language": 122.0
+        },
+        {
+          "persona": "anime",
+          "main_genre": "Animation",
+          "titles": 3318,
+          "language": "ja",
+          "titles_in_language": 1627.0
+        },
+        {
+          "persona": "family",
+          "main_genre": "Family",
+          "titles": 2245,
+          "language": null,
+          "titles_in_language": NaN
+        },
+        {
+          "persona": "horror",
+          "main_genre": "Horror",
+          "titles": 2241,
+          "language": null,
+          "titles_in_language": NaN
+        },
+        {
+          "persona": "documentary",
+          "main_genre": "Documentary",
+          "titles": 1065,
+          "language": null,
+          "titles_in_language": NaN
+        },
+        {
+          "persona": "scifi",
+          "main_genre": "Science Fiction",
+          "titles": 2905,
+          "language": null,
+          "titles_in_language": NaN
+        },
+        {
+          "persona": "crime",
+          "main_genre": "Crime",
+          "titles": 2671,
+          "language": null,
+          "titles_in_language": NaN
+        },
+        {
+          "persona": "comedy",
+          "main_genre": "Comedy",
+          "titles": 6943,
+          "language": null,
+          "titles_in_language": NaN
+        },
+        {
+          "persona": "cdrama",
+          "main_genre": "Drama",
+          "titles": 10246,
+          "language": "zh",
+          "titles_in_language": 576.0
+        }
+      ],
+      "missing_pct_by_type": {
+        "Movie": {
+          "director": 0.8,
+          "cast": 1.3,
+          "country": 2.9,
+          "genres": 0.7,
+          "description": 0.8
+        },
+        "TV Show": {
+          "director": 68.5,
+          "cast": 7.2,
+          "country": 11.2,
+          "genres": 6.1,
+          "description": 20.0
+        }
+      }
+    },
+    "simulation": {
+      "2": {
+        "events": 82743,
+        "items_watched": 15849,
+        "top_1pct_item_share": 0.056
+      },
+      "6": {
+        "events": 82440,
+        "items_watched": 10197,
+        "top_1pct_item_share": 0.072
+      },
+      "12": {
+        "events": 82603,
+        "items_watched": 6924,
+        "top_1pct_item_share": 0.078
+      }
+    }
+  },
+  "stage_seconds": {
+    "prepare": 25,
+    "baselines": 11,
+    "train": 420,
+    "analyse": 1,
+    "oracle": 26
+  },
+  "analyse": {
+    "H1": "rejected: text hurts",
+    "H2a": "supported",
+    "H2b": "not supported"
+  },
+  "oracle": {
+    "oracle_p2_recall@10": 0.0459,
+    "oracle_no_text_p2_recall@10": 0.0248,
+    "oracle_p6_recall@10": 0.0771,
+    "oracle_no_text_p6_recall@10": 0.0509,
+    "oracle_p12_recall@10": 0.1183,
+    "oracle_no_text_p12_recall@10": 0.0907
+  }
+}
