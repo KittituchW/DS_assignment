@@ -26,9 +26,16 @@ def _fake_two_tower() -> types.ModuleType:
     class TrainConfig:
         epochs: int = 1
         seed: int = 0
+        embed_dim: int = 64
+        hidden: int = 256
+        dropout: float = 0.2
+        temperature: float = 0.07
+        lr: float = 1e-3
+        activation: str = "relu"
 
     def train_two_tower(item_features, history, cfg, feature_mask=None, log=True):
-        table = np.random.default_rng(cfg.seed).normal(size=(item_features.shape[0], 8)).astype(np.float32)
+        rng = np.random.default_rng([cfg.seed, cfg.embed_dim, cfg.hidden])
+        table = rng.normal(size=(item_features.shape[0], 8)).astype(np.float32)
         return None, table, [1.0]
 
     module.TrainConfig = TrainConfig
@@ -52,7 +59,7 @@ def test_all_stages_run_and_write_their_outputs(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         sys, "argv",
         ["run_experiment.py", "--data-dir", str(data_dir), "--output", str(out), "--users", "40",
-         "--exponents", "2", "6", "--seeds", "1", "2", "--epochs", "1"],
+         "--exponents", "2", "6", "--seeds", "1", "2", "--epochs", "1", "--tune-trials", "3"],
     )
     runner.main()
 
@@ -61,6 +68,7 @@ def test_all_stages_run_and_write_their_outputs(tmp_path, monkeypatch) -> None:
         "results_summary.md", "h2_non_english_gap.png", "h1_text_ablation.png", "sample_recommendations.md",
         "eda_cleaning_funnel.png", "eda_vote_counts.png", "eda_vote_average_by_type.png",
         "eda_language_by_type.png", "eda_persona_pools.png", "eda_popularity_by_year.png",
+        "tuning.json", "tuning_trials.csv",
     ):
         assert (out / name).exists(), name
     tests = json.loads((out / "hypothesis_tests.json").read_text())
@@ -69,3 +77,9 @@ def test_all_stages_run_and_write_their_outputs(tmp_path, monkeypatch) -> None:
     runs = (out / "metrics_all_runs.csv").read_text()
     assert "two_tower_no_text" in runs and "content_knn_text_only" in runs and "popularity_by_type" in runs
     assert tests["H2"]["by_type_at_main_exponent"][-1]["model"] == "held-out watches"
+    tuned = tests["exploratory_tuned_two_tower"]
+    assert len(tuned["search"]["trials"]) == 3 and tuned["search"]["trials"][0]["activation"] == "relu"
+    assert tuned["h1_with_tuned_model"]["verdict"] in {"supported", "rejected: text hurts", "inconclusive"}
+    assert "two_tower_tuned_no_text" in runs
+    assert "hit@10" in runs and "recall_w@10" in runs
+    assert "Tuned two tower" in (out / "results_summary.md").read_text()

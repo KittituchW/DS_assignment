@@ -43,3 +43,12 @@ def test_text_mask_removes_the_masked_columns() -> None:
     _, a, _ = train_two_tower(feats, history, cfg, feature_mask=mask, log=False)
     _, b, _ = train_two_tower(changed, history, cfg, feature_mask=mask, log=False)
     np.testing.assert_allclose(a, b)
+
+
+@pytest.mark.parametrize("activation", ["relu", "gelu", "silu"])
+def test_every_activation_in_the_search_space_trains(activation: str) -> None:
+    feats, history = _toy_problem()
+    cfg = TrainConfig(embed_dim=8, hidden=16, epochs=10, batch_size=64, activation=activation)
+    _, table, losses = train_two_tower(feats, history, cfg, log=False)
+    np.testing.assert_allclose(np.linalg.norm(table, axis=1), 1.0, atol=1e-5)
+    assert losses[-1] < losses[0]

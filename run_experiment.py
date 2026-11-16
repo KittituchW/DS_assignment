@@ -1,13 +1,16 @@
 """Run the full experiment, stage by stage.
 
-Stages (default: all four, in order):
+Stages (default: all five, in order):
     prepare    check inputs, clean catalogue, EDA, item features, simulated viewers
     baselines  popularity (+ type-balanced check), most watched, content kNN (+ text-only and no-text)
     train      two tower: H1 ablation (5 seeds at p = 6) and H2 sweep (p = 2 and 12). Needs PyTorch.
+    tune       random search on a validation split, then the chosen settings on the test set
+               (exploratory, added after the main run). Needs PyTorch.
     analyse    H1 and H2 decision rules, result tables, figures, sample recommendations
 
 Examples:
-    python run_experiment.py --download                 # everything, about 10 minutes on a laptop CPU
+    python run_experiment.py --download                 # everything, about 30 minutes on a laptop CPU
+    python run_experiment.py --stages tune analyse      # only the search, after prepare and train
     python run_experiment.py --stages prepare baselines analyse   # no PyTorch needed
     python run_experiment.py --stages analyse           # re-run the analysis from saved runs
 """
@@ -47,11 +50,13 @@ from recommender.evaluation import (  # noqa: E402
     popularity_scorer,
     temporal_split,
     two_tower_scorer,
+    validation_split,
 )
 from recommender.features import ItemFeatures, build_item_features  # noqa: E402
 from recommender.simulate import SimConfig, demo_histories, simulate  # noqa: E402
+from recommender.tuning import pick_best, sample_configs  # noqa: E402
 
-STAGES = ["prepare", "baselines", "train", "analyse"]
+STAGES = ["prepare", "baselines", "train", "tune", "analyse"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,6 +71,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--sim-seed", type=int, default=42)
+    parser.add_argument("--tune-trials", type=int, default=20, help="settings tried in the random search, default first")
+    parser.add_argument("--tune-seed", type=int, default=0)
     return parser.parse_args()
 
 
@@ -183,16 +190,82 @@ def stage_train(args: argparse.Namespace, paths: Paths) -> None:
         print("   " + " ".join(f"{k}={v:.3f}" for k, v in summary.items()))
 
 
+def stage_tune(args: argparse.Namespace, paths: Paths) -> dict:
+    """Choose settings on a validation split, then run them once on the test set.
+
+    Validation = each viewer's latest training events, by the same rule as the test
+    split. The test set plays no part in the choice.
+    """
+    try:
+        from recommender.two_tower import TrainConfig, train_two_tower
+    except ImportError as exc:
+        raise SystemExit(f"PyTorch is needed for the tune stage ({exc}). Install requirements.txt or skip this stage.")
+
+    items, feats = load_items(paths)
+    p = args.main_exponent
+    split = load_split(paths, p, items)
+    val = validation_split(split)
+    trials = []
+    for i, config in enumerate(sample_configs(args.tune_trials, args.tune_seed)):
+        t0 = time.time()
+        _, table, _ = train_two_tower(
+            feats.matrix, val.history_matrix(), TrainConfig(epochs=args.epochs, seed=args.seeds[0], **config), log=False
+        )
+        summary, _ = evaluate(two_tower_scorer(table), val, items)
+        trials.append({"trial": i, **config, **{f"val_{k}": v for k, v in summary.items() if k in ("recall@10", "ndcg@10", "hit@10")},
+                       "seconds": round(time.time() - t0)})
+        print(f"  trial {i:2d} {config} val recall@10={summary['recall@10']:.4f} ({trials[-1]['seconds']}s)")
+    best_i = pick_best(trials)
+    best = {k: trials[best_i][k] for k in sample_configs(1)[0]}
+    search = {
+        "exponent": p,
+        "seed": args.seeds[0],
+        "trials": trials,
+        "best": best,
+        "best_val_recall@10": trials[best_i]["val_recall@10"],
+        "default_val_recall@10": trials[0]["val_recall@10"],
+    }
+    (paths.out / "tuning.json").write_text(json.dumps(search, indent=2), encoding="utf-8")
+    pd.DataFrame(trials).to_csv(paths.out / "tuning_trials.csv", index=False)
+    print(f"  chosen: {best}")
+
+    no_text = feats.mask_without("text")
+    for q in args.exponents:
+        q_split = split if q == p else load_split(paths, q, items)
+        for seed in args.seeds if q == p else args.seeds[:1]:
+            variants = [("two_tower_tuned", None)] + ([("two_tower_tuned_no_text", no_text)] if q == p else [])
+            for variant, mask in variants:
+                t0 = time.time()
+                _, table, losses = train_two_tower(
+                    feats.matrix, q_split.history_matrix(), TrainConfig(epochs=args.epochs, seed=seed, **best),
+                    feature_mask=mask, log=False,
+                )
+                summary, per_user = evaluate(two_tower_scorer(table), q_split, items)
+                analysis.save_run(
+                    paths.runs, variant, q, seed, summary, per_user, config=best,
+                    train_seconds=round(time.time() - t0), loss_history=[round(x, 4) for x in losses],
+                )
+                print(f"  p={q:g} {variant} seed={seed} recall@10={summary['recall@10']:.4f}")
+    return {"best": best, "best_val_recall@10": search["best_val_recall@10"], "default_val_recall@10": search["default_val_recall@10"]}
+
+
 def stage_analyse(args: argparse.Namespace, paths: Paths) -> dict:
     runs = analysis.all_runs_table(paths.runs)
     runs.to_csv(paths.out / "metrics_all_runs.csv", index=False)
     h1 = analysis.check_h1(paths.runs, args.main_exponent, args.seeds)
     h2 = analysis.check_h2(paths.runs, args.exponents, args.main_exponent, args.seeds)
     comparison = analysis.compare_two_tower(paths.runs, args.exponents, args.main_exponent, args.seeds)
+    tuning_path = paths.out / "tuning.json"
+    search = json.loads(tuning_path.read_text()) if tuning_path.exists() else None
+    tuned = analysis.tuned_summary(paths.runs, args.exponents, args.main_exponent, args.seeds, search)
     (paths.out / "hypothesis_tests.json").write_text(
-        json.dumps({"H1": h1, "H2": h2, "exploratory_two_tower_vs_content_knn": comparison}, indent=2), encoding="utf-8"
+        json.dumps(
+            {"H1": h1, "H2": h2, "exploratory_two_tower_vs_content_knn": comparison, "exploratory_tuned_two_tower": tuned},
+            indent=2, default=str,
+        ),
+        encoding="utf-8",
     )
-    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2, comparison), encoding="utf-8")
+    (paths.out / "results_summary.md").write_text(analysis.results_summary(runs, h1, h2, comparison, tuned), encoding="utf-8")
     analysis.save_figures(h1, h2, paths.out)
 
     items, feats = load_items(paths)
@@ -224,6 +297,7 @@ def main() -> None:
             "prepare": stage_prepare,
             "baselines": stage_baselines,
             "train": stage_train,
+            "tune": stage_tune,
             "analyse": stage_analyse,
         }[stage](args, paths)
         if result:

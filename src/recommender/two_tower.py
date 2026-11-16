@@ -11,6 +11,8 @@ Loss        full softmax over the recommendable catalogue with a temperature.
             positive never leaks into its own query.
 
 Ablations multiply the feature row by a 0/1 mask (see `ItemFeatures.mask_without`).
+The defaults below are the pre-registered settings. `tuning.py` searches around
+them on a validation split.
 """
 
 from __future__ import annotations
@@ -34,6 +36,10 @@ class TrainConfig:
     epochs: int = 10
     batch_size: int = 2048
     seed: int = 42
+    activation: str = "relu"
+
+
+ACTIVATIONS = {"relu": nn.ReLU, "gelu": nn.GELU, "silu": nn.SiLU}
 
 
 class ItemTower(nn.Module):
@@ -41,7 +47,7 @@ class ItemTower(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(n_features, cfg.hidden),
-            nn.ReLU(),
+            ACTIVATIONS[cfg.activation](),
             nn.Dropout(cfg.dropout),
             nn.Linear(cfg.hidden, cfg.embed_dim),
         )

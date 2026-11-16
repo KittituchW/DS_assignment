@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from scipy import sparse
 
-from recommender.evaluation import paired_bootstrap, per_user_metrics, temporal_split, top_k
+from recommender.evaluation import paired_bootstrap, per_user_metrics, temporal_split, top_k, validation_split
 
 
 def _events() -> pd.DataFrame:
@@ -86,3 +86,13 @@ def test_bootstrap_interval_contains_the_mean() -> None:
     diff = np.random.default_rng(0).normal(0.02, 0.1, size=500)
     mean, lo, hi = paired_bootstrap(diff)
     assert lo < mean < hi
+
+
+def test_validation_split_never_touches_the_test_set() -> None:
+    split = temporal_split(_events(), [f"i{j}" for j in range(10)])
+    val = validation_split(split)
+    test_pairs = set(zip(split.test.user_id, split.test.item_id))
+    assert not test_pairs & set(zip(val.train.user_id, val.train.item_id))
+    assert not test_pairs & set(zip(val.test.user_id, val.test.item_id))
+    a_val = val.test[val.test.user_id == "a"]
+    assert set(a_val.item_id) == {"i6", "i7"}  # the latest training events, before the test events i8 and i9

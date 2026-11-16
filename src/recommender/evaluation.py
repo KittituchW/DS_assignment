@@ -80,6 +80,15 @@ def temporal_split(events: pd.DataFrame, item_ids: list[str], test_frac: float =
     )
 
 
+def validation_split(split: Split, val_frac: float = 0.2) -> Split:
+    """For tuning only: carve each viewer's latest training events into a validation set.
+
+    Same rule as the test split, applied to the training events, so the test set
+    is never seen while choosing settings.
+    """
+    return temporal_split(split.train, list(split.item_index), val_frac)
+
+
 def top_k(scores: np.ndarray, history: sparse.csr_matrix, k: int) -> np.ndarray:
     scores = np.array(scores, dtype=np.float32, copy=True)
     scores[history.nonzero()] = -np.inf  # never recommend what was already watched

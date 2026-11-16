@@ -133,3 +133,19 @@ enters a decision rule, and the H1 and H2 verdicts stand as reported.
 The watch ratio is a rule we wrote, like the rest of the simulator. It shows
 whether the ranking also favours titles a viewer would finish under that rule,
 not whether real viewers would finish them.
+
+**2026-11-16, after the main run.** Settings search added (`tune` stage).
+The pre-registered settings (ReLU, 64-d output, 256 hidden units, dropout
+0.2, learning rate 1e-3, temperature 0.07) were chosen as standard defaults,
+not tuned. To check that choice, a random search tries 20 settings at
+p = 6: activation (ReLU, GELU, SiLU), output size, hidden size, dropout,
+learning rate and temperature, with the pre-registered settings as trial 0.
+
+1. **The test set plays no part in the choice.** Each viewer's latest training
+   events (same 20% rule as the test split) form a validation set. The search
+   trains on the rest and picks the highest validation Recall@10.
+2. **The chosen settings run once on the test set**, with the same seeds as the
+   main run, including the H1 text ablation.
+3. **The verdicts above are not changed.** They come from the pre-registered
+   settings. The tuned model, and the H1 rule applied to it, are reported next
+   to them as exploratory results.

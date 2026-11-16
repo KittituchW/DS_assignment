@@ -69,12 +69,14 @@ def _interval(values: tuple[float, float, float]) -> dict[str, float]:
 # ------------------------------------------------------------------ hypotheses
 
 
-def check_h1(run_dir: Path, exponent: float, seeds: list[int]) -> dict:
+def check_h1(
+    run_dir: Path, exponent: float, seeds: list[int], full_model: str = "two_tower", ablated_model: str = "two_tower_no_text"
+) -> dict:
     """Full model versus the text-ablated model, per-viewer metrics averaged over seeds."""
-    result: dict = {"exponent": exponent, "seeds": seeds}
+    result: dict = {"exponent": exponent, "seeds": seeds, "models": [full_model, ablated_model]}
     for metric in ("recall", "ndcg"):
-        full = _seed_mean(run_dir, "two_tower", exponent, seeds, metric)
-        no_text = _seed_mean(run_dir, "two_tower_no_text", exponent, seeds, metric)
+        full = _seed_mean(run_dir, full_model, exponent, seeds, metric)
+        no_text = _seed_mean(run_dir, ablated_model, exponent, seeds, metric)
         if full is None or no_text is None:
             return {**result, "verdict": "not run", "reason": "two tower runs missing"}
         result[f"{metric}@10_full"] = float(full.mean())
@@ -85,8 +87,8 @@ def check_h1(run_dir: Path, exponent: float, seeds: list[int]) -> dict:
         per_seed.append(
             {
                 "seed": s,
-                "recall@10_full": float(load_run(run_dir, "two_tower", exponent, s)["recall"].mean()),
-                "recall@10_no_text": float(load_run(run_dir, "two_tower_no_text", exponent, s)["recall"].mean()),
+                "recall@10_full": float(load_run(run_dir, full_model, exponent, s)["recall"].mean()),
+                "recall@10_no_text": float(load_run(run_dir, ablated_model, exponent, s)["recall"].mean()),
             }
         )
     result["per_seed"] = per_seed
@@ -179,27 +181,57 @@ def check_h2(run_dir: Path, exponents: list[float], main_exponent: float, seeds:
     }
 
 
-def compare_two_tower(run_dir: Path, exponents: list[float], main_exponent: float, seeds: list[int], baseline: str = "content_knn") -> list[dict]:
-    """Exploratory, never part of a verdict: two tower minus a baseline, per viewer, at each p.
+def _trained(model: str) -> bool:
+    return model.startswith("two_tower")
 
-    Hit@10 and watch-weighted Recall@10 were added after the main run. They are
-    reported next to Recall@10 so the reader can see whether they tell the same story.
+
+def compare_models(
+    run_dir: Path, model: str, baseline: str, exponents: list[float], main_exponent: float, seeds: list[int]
+) -> list[dict]:
+    """Exploratory, never part of a verdict: model minus baseline, per viewer, at each p.
+
+    Trained models are averaged over their seeds (all seeds at the main p, the first
+    seed elsewhere). Hit@10 and watch-weighted Recall@10 were added after the main
+    run; runs saved before that are skipped for those metrics rather than faked.
     """
     rows = []
     for p in exponents:
-        tt_seeds = seeds if p == main_exponent else seeds[:1]
-        row: dict = {"exponent": p, "baseline": baseline, "two_tower_seeds": tt_seeds}
-        tt_runs = [load_run(run_dir, "two_tower", p, s) for s in tt_seeds]
-        base = load_run(run_dir, baseline, p, None)
+        p_seeds = seeds if p == main_exponent else seeds[:1]
+        runs = {
+            name: [load_run(run_dir, name, p, s) for s in (p_seeds if _trained(name) else [None])]
+            for name in (model, baseline)
+        }
+        row: dict = {"exponent": p, "model": model, "baseline": baseline}
         for metric in ("recall", "hit", "recall_w"):
-            if base is None or metric not in base or any(r is None or metric not in r for r in tt_runs):
+            if any(r is None or metric not in r for name in runs for r in runs[name]):
                 continue
-            tt = np.mean([r[metric] for r in tt_runs], axis=0)
-            row[f"{metric}@10_two_tower"] = float(np.nanmean(tt))
-            row[f"{metric}@10_{baseline}"] = float(np.nanmean(base[metric]))
-            row[f"{metric}@10_difference"] = _interval(paired_bootstrap(tt - base[metric], BOOTSTRAP_SAMPLES))
+            a, b = (np.mean([r[metric] for r in runs[name]], axis=0) for name in (model, baseline))
+            row[f"{metric}@10_model"] = float(np.nanmean(a))
+            row[f"{metric}@10_baseline"] = float(np.nanmean(b))
+            row[f"{metric}@10_difference"] = _interval(paired_bootstrap(a - b, BOOTSTRAP_SAMPLES))
         rows.append(row)
     return rows
+
+
+def compare_two_tower(run_dir: Path, exponents: list[float], main_exponent: float, seeds: list[int], baseline: str = "content_knn") -> list[dict]:
+    return compare_models(run_dir, "two_tower", baseline, exponents, main_exponent, seeds)
+
+
+def tuned_summary(run_dir: Path, exponents: list[float], main_exponent: float, seeds: list[int], tuning: dict | None) -> dict | None:
+    """Everything reported about the tuned model. Exploratory: no verdict changes."""
+    if tuning is None or load_run(run_dir, "two_tower_tuned", main_exponent, seeds[0]) is None:
+        return None
+    gaps = []
+    for p in exponents:
+        gap = _gap(run_dir, "two_tower_tuned", p, seeds if p == main_exponent else seeds[:1])
+        gaps.append({"exponent": p, **(gap or {})})
+    return {
+        "search": tuning,
+        "h1_with_tuned_model": check_h1(run_dir, main_exponent, seeds, "two_tower_tuned", "two_tower_tuned_no_text"),
+        "tuned_vs_default": compare_models(run_dir, "two_tower_tuned", "two_tower", exponents, main_exponent, seeds),
+        "tuned_vs_content_knn": compare_models(run_dir, "two_tower_tuned", "content_knn", exponents, main_exponent, seeds),
+        "h2_gap": gaps,
+    }
 
 
 # ------------------------------------------------------------------ sample recommendations
@@ -261,7 +293,20 @@ def _pts(interval: dict | None) -> str:
     return f"{interval['mean'] * 100:+.1f} pts [{interval['ci_low'] * 100:+.1f}, {interval['ci_high'] * 100:+.1f}]"
 
 
-def results_summary(runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dict] | None = None) -> str:
+def _comparison_table(rows: list[dict]) -> str:
+    table = []
+    for row in rows:
+        entry = {"p": f"{row['exponent']:g}"}
+        for metric, label in (("recall", "Recall@10"), ("hit", "Hit@10"), ("recall_w", "Watch-weighted Recall@10")):
+            if f"{metric}@10_difference" in row:
+                entry[label] = _pts(row[f"{metric}@10_difference"])
+        table.append(entry)
+    return markdown_table(pd.DataFrame(table))
+
+
+def results_summary(
+    runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dict] | None = None, tuned: dict | None = None
+) -> str:
     lines = [
         "# Results summary (generated)",
         "",
@@ -270,7 +315,7 @@ def results_summary(runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dic
         "",
         "## All runs",
         "",
-        markdown_table(runs.drop(columns=[c for c in ("loss_history",) if c in runs.columns])),
+        markdown_table(runs.drop(columns=[c for c in ("loss_history", "config") if c in runs.columns])),
         "",
         "## H1: text beyond genre",
         "",
@@ -316,20 +361,44 @@ def results_summary(runs: pd.DataFrame, h1: dict, h2: dict, comparison: list[dic
             "",
         ]
     if comparison:
-        table = []
-        for row in comparison:
-            entry = {"p": f"{row['exponent']:g}"}
-            for metric, label in (("recall", "Recall@10"), ("hit", "Hit@10"), ("recall_w", "Watch-weighted Recall@10")):
-                if f"{metric}@10_difference" in row:
-                    entry[label] = _pts(row[f"{metric}@10_difference"])
-            table.append(entry)
         lines += [
             f"## Two tower minus {comparison[0]['baseline']} (exploratory)",
             "",
             "Paired bootstrap over viewers. Hit@10 and watch-weighted Recall@10 were added after the main run",
             "and are not part of any decision rule.",
             "",
-            markdown_table(pd.DataFrame(table)),
+            _comparison_table(comparison),
+            "",
+        ]
+    if tuned:
+        search = tuned["search"]
+        trials = pd.DataFrame(search["trials"]).sort_values("val_recall@10", ascending=False)
+        h1t = tuned["h1_with_tuned_model"]
+        lines += [
+            "## Tuned two tower (exploratory, added after the main run)",
+            "",
+            f"Random search over {len(trials)} settings at p = {search['exponent']:g}, scored on a validation split",
+            "carved from each viewer's training events. The test set was used once, for the chosen settings.",
+            f"Chosen: `{json.dumps(search['best'])}`. Validation Recall@10 {search['best_val_recall@10']:.4f}"
+            f" against {search['default_val_recall@10']:.4f} for the pre-registered settings.",
+            "",
+            "Top validation trials:",
+            "",
+            markdown_table(trials.head(8), "{:.4f}"),
+            "",
+            f"H1 rule applied to the tuned model: **{h1t['verdict']}**"
+            + (f", Recall@10 difference {_pts(h1t['recall@10_difference'])}." if "recall@10_difference" in h1t else "."),
+            "",
+            "Tuned minus pre-registered two tower (test set):",
+            "",
+            _comparison_table(tuned["tuned_vs_default"]),
+            "",
+            "Tuned two tower minus content kNN (test set):",
+            "",
+            _comparison_table(tuned["tuned_vs_content_knn"]),
+            "",
+            "Tuned two tower non-English gap against held-out watches: "
+            + ", ".join(f"p = {g['exponent']:g}: {_pts(g.get('gap'))}" for g in tuned["h2_gap"]),
             "",
         ]
     return "\n".join(lines)

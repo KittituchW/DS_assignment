@@ -129,6 +129,14 @@ Hit@10 (at least one held-out title in the top 10) and watch-weighted Recall@10
 (each held-out title counts by its simulated watch ratio, so a finished title
 counts more). See the 2026-11-16 entry in HYPOTHESES.md.
 
+**Settings search.** The model settings above are standard defaults fixed
+before training. The `tune` stage checks them with a random search over 20
+settings (activation ReLU/GELU/SiLU, output size, hidden size, dropout,
+learning rate, temperature) scored on a validation split carved from each
+viewer's training events. The chosen settings then run once on the test set.
+The tuned model is reported next to the pre-registered one; the verdicts are
+not changed.
+
 ## 5. How to run
 
 Python 3.10 or newer, CPU only.
@@ -139,9 +147,10 @@ pip install -r requirements.txt
 python run_experiment.py --download    # downloads the two CSVs into data/raw, then runs every stage
 ```
 
-The full run takes about 10 minutes on a laptop CPU: under a minute to
-prepare, seconds for the baselines, and 30 to 50 seconds per two tower run
-(12 runs). The
+The full run takes about 30 minutes on a laptop CPU: under a minute to
+prepare, seconds for the baselines, 30 to 50 seconds per two tower run
+(12 runs), and about 20 minutes for the settings search and the tuned runs.
+Skip the search with `--stages prepare baselines train analyse`. The
 download is pinned to one commit of the dataset repository and the run checks
 each file's SHA-256.
 
@@ -150,6 +159,7 @@ Stages can be run on their own:
 ```bash
 python run_experiment.py --stages prepare baselines analyse   # no PyTorch needed
 python run_experiment.py --stages train analyse               # after prepare
+python run_experiment.py --stages tune analyse                # settings search, after train
 python run_experiment.py --stages analyse                     # rebuild tables from saved runs
 pytest -q                                                     # unit and pipeline tests
 ```
@@ -163,6 +173,7 @@ src/recommender/features.py    item features in named groups           (feature 
 src/recommender/simulate.py    persona-based viewer simulator
 src/recommender/two_tower.py   two tower model and training loop       (model training, the only torch import)
 src/recommender/evaluation.py  split, metrics, baselines, bootstrap    (evaluation)
+src/recommender/tuning.py      settings search space and selection     (tuning, validation split only)
 src/recommender/analysis.py    H1/H2 decision rules, tables, figures, sample recommendations
 src/recommender/plotting.py    shared chart style (validated colour-blind-safe palette)
 run_experiment.py              runs the stages in order
